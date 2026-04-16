@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7
+    container_name: urban-redis
+    ports:
+      - "6379:6379"
+
+  fake-data-service:
+    build:
+      context: ../services/fake-data-service
+      dockerfile: deployments/Dockerfile
+    container_name: fake-data-service
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=redis:6379
