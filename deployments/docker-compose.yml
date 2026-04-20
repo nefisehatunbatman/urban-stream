@@ -1,11 +1,29 @@
-version: "3.8"
-
 services:
   redis:
     image: redis:7
     container_name: urban-redis
     ports:
       - "6379:6379"
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: urban-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: urban-zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   fake-data-service:
     build:
@@ -16,3 +34,25 @@ services:
       - redis
     environment:
       - REDIS_URL=redis:6379
+
+  analytics-consumer:
+    build:
+      context: ../services/analytics-consumer
+      dockerfile: deployments/Dockerfile
+    container_name: analytics-consumer
+    depends_on:
+      - kafka
+    environment:
+      - KAFKA_BROKER=kafka:9092
+
+  kafka-gatekeeper:
+    build:
+      context: ../services/kafka-gatekeeper
+      dockerfile: deployments/Dockerfile
+    container_name: kafka-gatekeeper
+    depends_on:
+      - redis
+      - kafka
+    environment:
+      - REDIS_URL=redis:6379
+      - KAFKA_BROKER=kafka:9092

@@ -23,7 +23,7 @@ func main() {
 		Addr: cfg.RedisURL,
 	})
 
-	// 3. Bağlantıyı test et
+	// 3. Bağlantıyı test et baglanti yoksa veri uretmek anlamsiz olur
 	_, err := rdb.Ping(context.Background()).Result()
 	if err != nil {
 		log.Fatalf("Redis bağlantı hatası: %v", err)
