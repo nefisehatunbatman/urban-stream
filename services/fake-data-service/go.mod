@@ -1,6 +1,6 @@
 module fake-data-service
 
-go 1.26.1
+go 1.24
 
 require github.com/redis/go-redis/v9 v9.18.0
 

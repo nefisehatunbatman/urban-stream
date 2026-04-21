@@ -4,6 +4,11 @@ services:
     container_name: urban-redis
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -14,6 +19,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
+    container_name: deployments-kafka-1
     depends_on:
       - zookeeper
     ports:
@@ -31,19 +37,10 @@ services:
       dockerfile: deployments/Dockerfile
     container_name: fake-data-service
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     environment:
-      - REDIS_URL=redis:6379
-
-  analytics-consumer:
-    build:
-      context: ../services/analytics-consumer
-      dockerfile: deployments/Dockerfile
-    container_name: analytics-consumer
-    depends_on:
-      - kafka
-    environment:
-      - KAFKA_BROKER=kafka:9092
+      - REDIS_URL=urban-redis:6379
 
   kafka-gatekeeper:
     build:
@@ -51,8 +48,49 @@ services:
       dockerfile: deployments/Dockerfile
     container_name: kafka-gatekeeper
     depends_on:
-      - redis
-      - kafka
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
     environment:
-      - REDIS_URL=redis:6379
+      - REDIS_URL=urban-redis:6379
       - KAFKA_BROKER=kafka:9092
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: urban-clickhouse
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=urban123
+      - CLICKHOUSE_DB=default
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  analytics-consumer:
+    build:
+      context: ../services/analytics-consumer
+      dockerfile: deployments/Dockerfile
+    container_name: analytics-consumer
+    depends_on:
+      kafka:
+        condition: service_started
+      clickhouse:
+        condition: service_healthy
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - CLICKHOUSE_HOST=urban-clickhouse
+      - CLICKHOUSE_PORT=9000
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=urban123
+      - CLICKHOUSE_DB=default
+
+volumes:
+  clickhouse_data:

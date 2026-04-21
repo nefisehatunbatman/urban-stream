@@ -3,24 +3,36 @@ package consumer
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
-var ctx = context.Background()
-
-// StartRedisSubscriber Redis'ten veri dinler
+// StartRedisSubscriber Redis'ten veri dinler ve gelen mesajları messageHandler'a iletir
 func StartRedisSubscriber(rdb *redis.Client, messageHandler func(channel string, message string)) {
 
-	pubsub := rdb.PSubscribe(ctx, "city:*") //normal subcribes yerine patternsubcribes yani basinde city olan hepsini dinle
+	ctx := context.Background()
 
-	log.Println("Redis'e subscribe olundu...")
+	// Redis hazır olana kadar bekle
+	for i := 0; i < 10; i++ {
+		if err := rdb.Ping(ctx).Err(); err == nil {
+			log.Println("Redis bağlantısı başarılı")
+			break
+		}
+		log.Printf("Redis hazır değil, retry... (%d/10)", i+1)
+		time.Sleep(3 * time.Second)
+	}
 
-	ch := pubsub.Channel() //verileri tasima bandi
+	// city: ile başlayan tüm kanalları dinle (pattern subscribe)
+	pubsub := rdb.PSubscribe(ctx, "city:*")
+	defer pubsub.Close()
+
+	log.Println("Redis'e subscribe olundu: city:*")
+
+	ch := pubsub.Channel()
 
 	for msg := range ch {
-		log.Printf("Gelen veri [%s]: %s\n", msg.Channel, msg.Payload)
-		// gelen veriyi dışarıya gönder (Kafka'ya)
+		log.Printf("Gelen veri [%s]: %s", msg.Channel, msg.Payload)
 		messageHandler(msg.Channel, msg.Payload)
 	}
 }

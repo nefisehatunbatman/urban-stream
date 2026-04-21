@@ -14,25 +14,24 @@ func main() {
 
 	log.Println("Kafka Gatekeeper Starting...")
 
-	// Redis bağlantısı
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
 		redisURL = "redis:6379"
+	}
+
+	kafkaBroker := os.Getenv("KAFKA_BROKER")
+	if kafkaBroker == "" {
+		kafkaBroker = "kafka:9092"
 	}
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr: redisURL,
 	})
 
-	// Kafka bağlantısı
-	kafkaBroker := "kafka:9092"
 	kp := producer.NewKafkaProducer(kafkaBroker)
 
-	// Redis subscriber başlat
 	consumer.StartRedisSubscriber(rdb, func(channel string, message string) {
-
 		topic := producer.MapChannelToTopic(channel)
-
 		kp.SendMessage(topic, message)
 	})
 }

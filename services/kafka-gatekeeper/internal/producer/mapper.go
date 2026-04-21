@@ -2,7 +2,8 @@ package producer
 
 import "strings"
 
-// Redis channel → Kafka topic
+// MapChannelToTopic Redis channel'ını Kafka topic'ine dönüştürür
+// Örnek: city:traffic_lights → city.traffic_lights
 func MapChannelToTopic(channel string) string {
 	return strings.ReplaceAll(channel, ":", ".")
 }

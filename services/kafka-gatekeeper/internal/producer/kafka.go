@@ -10,42 +10,46 @@ import (
 
 type KafkaProducer struct {
 	writer *kafka.Writer
+	broker string
 }
 
-// Kafka bağlantısı (retry ile)
+// NewKafkaProducer Kafka bağlantısını retry ile kurar
 func NewKafkaProducer(broker string) *KafkaProducer {
 
-	var writer *kafka.Writer
-
 	for i := 0; i < 10; i++ {
-		writer = &kafka.Writer{
-			Addr:     kafka.TCP(broker),
-			Balancer: &kafka.LeastBytes{},
-		}
-
-		err := writer.WriteMessages(context.Background(),
-			kafka.Message{
-				Topic: "test",
-				Value: []byte("ping"),
-			},
-		)
-
+		conn, err := kafka.Dial("tcp", broker)
 		if err == nil {
+			conn.Close()
 			log.Println("Kafka bağlantısı başarılı")
-			break
+
+			writer := &kafka.Writer{
+				Addr:                   kafka.TCP(broker),
+				Balancer:               &kafka.LeastBytes{},
+				AllowAutoTopicCreation: true,
+			}
+
+			return &KafkaProducer{
+				writer: writer,
+				broker: broker,
+			}
 		}
 
-		log.Println("Kafka hazır değil, retry...", i)
+		log.Printf("Kafka hazır değil, retry... (%d/10)", i+1)
 		time.Sleep(3 * time.Second)
 	}
 
-	return &KafkaProducer{
-		writer: writer,
-	}
+	log.Fatal("Kafka bağlantısı kurulamadı, sistem durduruluyor.")
+	return nil
 }
 
-// BU FONKSİYON EKSİKTİ (KRİTİK)
+// SendMessage Kafka topic'ine mesaj gönderir
 func (kp *KafkaProducer) SendMessage(topic string, message string) {
+
+	if kp.writer == nil {
+		log.Println("Kafka writer nil, mesaj gönderilemedi")
+		return
+	}
+
 	err := kp.writer.WriteMessages(context.Background(),
 		kafka.Message{
 			Topic: topic,
@@ -54,9 +58,9 @@ func (kp *KafkaProducer) SendMessage(topic string, message string) {
 	)
 
 	if err != nil {
-		log.Println("Kafka gönderim hatası:", err)
+		log.Printf("Kafka gönderim hatası [%s]: %v", topic, err)
 		return
 	}
 
-	log.Printf("Kafka'ya gönderildi [%s]\n", topic)
+	log.Printf("Kafka'ya gönderildi [%s]", topic)
 }

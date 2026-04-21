@@ -5,25 +5,25 @@ import (
 	"log"
 	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/segmentio/kafka-go"
 )
 
-func StartKafkaConsumer(broker string, topic string) {
+func StartKafkaConsumer(broker string, topic string, conn clickhouse.Conn) {
 
 	var reader *kafka.Reader
 
-	// 🔥 Kafka hazır olana kadar bekle
 	for i := 0; i < 10; i++ {
-		conn, err := kafka.Dial("tcp", broker)
+		kConn, err := kafka.Dial("tcp", broker)
 		if err == nil {
-			conn.Close()
-			log.Println("Kafka bağlantısı başarılı:", topic)
+			kConn.Close()
 
-			// reader'ı burada oluştur (daha doğru)
+			log.Printf("Kafka bağlantısı başarılı: %s", topic)
+
 			reader = kafka.NewReader(kafka.ReaderConfig{
 				Brokers:  []string{broker},
 				Topic:    topic,
-				GroupID:  "analytics-" + topic, // 🔥 CRITICAL FIX
+				GroupID:  "analytics-" + topic,
 				MinBytes: 1,
 				MaxBytes: 10e6,
 			})
@@ -31,25 +31,39 @@ func StartKafkaConsumer(broker string, topic string) {
 			break
 		}
 
-		log.Println("Kafka hazır değil, retry...", i)
+		log.Printf("Kafka hazır değil, retry... (%d/10) topic: %s", i+1, topic)
 		time.Sleep(3 * time.Second)
 	}
 
 	if reader == nil {
-		log.Println("Kafka bağlantısı kurulamadı:", topic)
+		log.Printf("Kafka bağlantısı kurulamadı: %s", topic)
 		return
 	}
 
-	log.Println("Kafka consumer başladı:", topic)
+	defer reader.Close()
+
+	log.Printf("Kafka consumer başladı: %s", topic)
 
 	for {
 		msg, err := reader.ReadMessage(context.Background())
 		if err != nil {
-			log.Println("Kafka okuma hatası:", err)
+			log.Printf("Kafka okuma hatası [%s]: %v", topic, err)
 			time.Sleep(2 * time.Second)
 			continue
 		}
 
-		log.Printf("Veri alındı [%s]: %s\n", topic, string(msg.Value))
+		message := string(msg.Value)
+		log.Printf("Veri alındı [%s]: %s", topic, message)
+
+		switch topic {
+		case "city.traffic_lights":
+			HandleTrafficLights(conn, message)
+		case "city.density":
+			HandleDensity(conn, message)
+		case "city.speed_violations":
+			HandleSpeedViolations(conn, message)
+		default:
+			log.Printf("Bilinmeyen topic: %s", topic)
+		}
 	}
 }
