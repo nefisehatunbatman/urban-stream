@@ -1,0 +1,7 @@
+clickhouse-driver==0.2.7
+pandas==2.2.2
+prophet==1.1.5
+schedule==1.2.1
+numpy==1.26.4
+pystan==3.9.1
+cmdstanpy==1.2.4

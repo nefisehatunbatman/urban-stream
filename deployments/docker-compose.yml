@@ -92,5 +92,24 @@ services:
       - CLICKHOUSE_PASSWORD=urban123
       - CLICKHOUSE_DB=default
 
+  ai-service:
+    build:
+      context: ../services/ai-service
+      dockerfile: deployments/Dockerfile
+    container_name: urban-ai-service
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      - CLICKHOUSE_HOST=urban-clickhouse
+      - CLICKHOUSE_PORT=9000
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=urban123
+      - CLICKHOUSE_DB=default
+      - HISTORY_DAYS=30
+      - FORECAST_DAYS=14
+      - SCHEDULER_HOUR=0
+      - SCHEDULER_MINUTE=0
+
 volumes:
   clickhouse_data:
