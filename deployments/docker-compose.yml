@@ -111,5 +111,71 @@ services:
       - SCHEDULER_HOUR=0
       - SCHEDULER_MINUTE=0
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: urban-postgres
+    environment:
+      - POSTGRES_USER=urban
+      - POSTGRES_PASSWORD=urban123
+      - POSTGRES_DB=auth_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U urban -d auth_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  auth-service:
+    build:
+      context: ../services/auth-service
+      dockerfile: deployments/Dockerfile
+    container_name: urban-auth-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      - PORT=8081
+      - POSTGRES_HOST=urban-postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=urban
+      - POSTGRES_PASSWORD=urban123
+      - POSTGRES_DB=auth_db
+      - PRIVATE_KEY_PATH=/app/keys/private.pem
+      - PUBLIC_KEY_PATH=/app/keys/public.pem
+      - ACCESS_TOKEN_MINUTES=15
+      - REFRESH_TOKEN_DAYS=7
+    volumes:
+      - ../services/auth-service/keys:/app/keys:ro
+
+  api-service:
+    build:
+      context: ../services/api-service
+      dockerfile: deployments/Dockerfile
+    container_name: urban-api-service
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    ports:
+      - "8082:8082"
+    environment:
+      - PORT=8082
+      - CLICKHOUSE_HOST=urban-clickhouse
+      - CLICKHOUSE_PORT=9000
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=urban123
+      - CLICKHOUSE_DB=default
+      - PUBLIC_KEY_PATH=/app/keys/public.pem
+      - KAFKA_BROKER=kafka:9092
+    volumes:
+      - ../services/auth-service/keys:/app/keys:ro
+
 volumes:
   clickhouse_data:
+  postgres_data:

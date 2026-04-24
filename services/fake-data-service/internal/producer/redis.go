@@ -22,15 +22,15 @@ func produceTrafficLights(rdb *redis.Client) {
 	ticker := time.NewTicker(time.Second / 300) //saniyede 300 veri uretilmesini saglar
 
 	defer ticker.Stop()
-
-	for range ticker.C {
+	//aslinda burda gizli bir channel var
+	for range ticker.C { //burda da channeli okuduk
 		data := generator.GenerateTrafficLight()
 
 		payload, err := json.Marshal(data)
 		if err != nil {
 			continue
 		}
-		//burda ticker sayesinde ve continue sayesinde 3sn sonra tekrar dene diyoruz
+		//burda ticker sayesinde ve continue sayesinde 3ms sonra tekrar dene diyoruz
 		err = rdb.Publish(ctx, "city:traffic_lights", payload).Err()
 		if err != nil {
 			continue

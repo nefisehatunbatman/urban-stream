@@ -8,7 +8,7 @@ type Location struct {
 	Lng float64 `json:"lng"`
 }
 
-// TrafficLight city:traffic_lights kanalı için veri yapısı [cite: 17, 18, 19]
+// TrafficLight city:traffic_lights kanalı için veri yapısı
 type TrafficLight struct {
 	LampID           string   `json:"lamp_id"`
 	Status           string   `json:"status"` // green, yellow, red
@@ -18,14 +18,14 @@ type TrafficLight struct {
 	Location         Location `json:"location"`
 }
 
-// VehicleTypes araç tiplerinin dağılımını temsil eder [cite: 22, 23]
+// VehicleTypes araç tiplerinin dağılımını temsil eder
 type VehicleTypes struct {
 	Bus  int `json:"bus"`
 	Car  int `json:"car"`
 	Bike int `json:"bike"`
 }
 
-// Density city:density kanalı için veri yapısı [cite: 20, 21, 24]
+// Density city:density kanalı için veri yapısı
 type Density struct {
 	ZoneID          string       `json:"zone_id"`
 	VehicleCount    int          `json:"vehicle_count"`
@@ -36,7 +36,7 @@ type Density struct {
 	Timestamp       time.Time    `json:"timestamp"`
 }
 
-// SpeedViolation city:speed_violations kanalı için veri yapısı [cite: 25, 26]
+// SpeedViolation city:speed_violations kanalı için veri yapısı
 type SpeedViolation struct {
 	VehicleID string   `json:"vehicle_id"`
 	Speed     int      `json:"speed"`

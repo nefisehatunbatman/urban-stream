@@ -24,7 +24,7 @@ func NewKafkaProducer(broker string) *KafkaProducer {
 
 			writer := &kafka.Writer{
 				Addr:                   kafka.TCP(broker),
-				Balancer:               &kafka.LeastBytes{},
+				Balancer:               &kafka.LeastBytes{}, //mesajlar en az dolu partitiona gider
 				AllowAutoTopicCreation: true,
 			}
 
