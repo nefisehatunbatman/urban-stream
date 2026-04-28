@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"kafka-gatekeeper/internal/consumer"
 	"kafka-gatekeeper/internal/producer"
@@ -11,7 +13,6 @@ import (
 )
 
 func main() {
-
 	log.Println("Kafka Gatekeeper Starting...")
 
 	redisURL := os.Getenv("REDIS_URL")
@@ -29,6 +30,16 @@ func main() {
 	})
 
 	kp := producer.NewKafkaProducer(kafkaBroker)
+
+	// Uygulama kapanırken bekleyen batch'leri flush et
+	go func() {
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+		<-sig
+		log.Println("Kapatılıyor, Kafka flush ediliyor...")
+		kp.Close()
+		os.Exit(0)
+	}()
 
 	consumer.StartRedisSubscriber(rdb, func(channel string, message string) {
 		topic := producer.MapChannelToTopic(channel)

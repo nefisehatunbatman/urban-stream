@@ -10,12 +10,9 @@ import (
 
 type KafkaProducer struct {
 	writer *kafka.Writer
-	broker string
 }
 
-// NewKafkaProducer Kafka bağlantısını retry ile kurar
 func NewKafkaProducer(broker string) *KafkaProducer {
-
 	for i := 0; i < 10; i++ {
 		conn, err := kafka.Dial("tcp", broker)
 		if err == nil {
@@ -24,14 +21,28 @@ func NewKafkaProducer(broker string) *KafkaProducer {
 
 			writer := &kafka.Writer{
 				Addr:                   kafka.TCP(broker),
-				Balancer:               &kafka.LeastBytes{}, //mesajlar en az dolu partitiona gider
+				Balancer:               &kafka.LeastBytes{},
 				AllowAutoTopicCreation: true,
+
+				// ── Yüksek throughput ayarları ────────────────────────────
+				// Async: ACK beklemeden devam et — en kritik ayar
+				Async: true,
+
+				// Batch: 300 msg/s × 3 kanal = 900 msg/s toplam
+				// 5ms'de bir veya 300 mesaj dolunca flush
+				BatchSize:    300,
+				BatchTimeout: 5 * time.Millisecond,
+
+				// Write timeout: tek mesaj için değil batch için
+				WriteTimeout: 10 * time.Second,
+
+				// Hata logla ama panic yapma
+				ErrorLogger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
+					log.Printf("[kafka-error] "+msg, args...)
+				}),
 			}
 
-			return &KafkaProducer{
-				writer: writer,
-				broker: broker,
-			}
+			return &KafkaProducer{writer: writer}
 		}
 
 		log.Printf("Kafka hazır değil, retry... (%d/10)", i+1)
@@ -42,11 +53,10 @@ func NewKafkaProducer(broker string) *KafkaProducer {
 	return nil
 }
 
-// SendMessage Kafka topic'ine mesaj gönderir
+// SendMessage: non-blocking, Kafka writer internal queue'ya ekler.
+// Batch dolunca veya BatchTimeout geçince otomatik flush olur.
 func (kp *KafkaProducer) SendMessage(topic string, message string) {
-
 	if kp.writer == nil {
-		log.Println("Kafka writer nil, mesaj gönderilemedi")
 		return
 	}
 
@@ -56,11 +66,16 @@ func (kp *KafkaProducer) SendMessage(topic string, message string) {
 			Value: []byte(message),
 		},
 	)
-
 	if err != nil {
+		// Async modda bu nadiren tetiklenir (sadece writer kapandıysa)
 		log.Printf("Kafka gönderim hatası [%s]: %v", topic, err)
-		return
 	}
+	// log.Printf kaldırıldı — 900 msg/s'de log I/O ciddi bottleneck
+}
 
-	log.Printf("Kafka'ya gönderildi [%s]", topic)
+// Close: uygulama kapanırken bekleyen batch'leri flush et
+func (kp *KafkaProducer) Close() {
+	if kp.writer != nil {
+		kp.writer.Close()
+	}
 }

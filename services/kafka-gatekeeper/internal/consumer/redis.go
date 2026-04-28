@@ -8,12 +8,9 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// StartRedisSubscriber Redis'ten veri dinler ve gelen mesajları messageHandler'a iletir
 func StartRedisSubscriber(rdb *redis.Client, messageHandler func(channel string, message string)) {
-
 	ctx := context.Background()
 
-	// Redis hazır olana kadar bekle
 	for i := 0; i < 10; i++ {
 		if err := rdb.Ping(ctx).Err(); err == nil {
 			log.Println("Redis bağlantısı başarılı")
@@ -23,16 +20,16 @@ func StartRedisSubscriber(rdb *redis.Client, messageHandler func(channel string,
 		time.Sleep(3 * time.Second)
 	}
 
-	// city: ile başlayan tüm kanalları dinle (pattern subscribe)
 	pubsub := rdb.PSubscribe(ctx, "city:*")
 	defer pubsub.Close()
 
 	log.Println("Redis'e subscribe olundu: city:*")
 
-	ch := pubsub.Channel()
+	// Read buffer artırıldı — 300 msg/s × 3 kanal için yeterli alan
+	ch := pubsub.ChannelSize(2000)
 
 	for msg := range ch {
-		log.Printf("Gelen veri [%s]: %s", msg.Channel, msg.Payload)
+		// log.Printf kaldırıldı — 900 msg/s'de log I/O bottleneck
 		messageHandler(msg.Channel, msg.Payload)
 	}
 }

@@ -34,20 +34,22 @@ const ALL_LAMPS = INTERSECTIONS.flatMap(inter =>
   }))
 )
 
-// lampId → intersectionType hızlı erişim
-const LAMP_TYPE_MAP: Record<string, IntersectionType> = {}
-ALL_LAMPS.forEach(l => { LAMP_TYPE_MAP[l.lampId] = l.intersectionType })
-
 // ─── Tipler ────────────────────────────────────────────────────────────────────
 type LightStatus = 'red' | 'yellow' | 'green'
 
+// Her history girdisi: hangi duruma girildi, ne zaman, ne kadar sürdü.
+// 'aktif' → hâlâ bu fazda, henüz bitmedi.
+interface HistoryEntry {
+  status:    LightStatus
+  enteredAt: string // "14:32:07"
+  duration:  string // "23s" veya "aktif"
+}
+
 interface LampState {
   status:           LightStatus
-  timeRemains:      number
   isMalfunctioning: boolean
-  /** Verinin kaynağı: 'sensor' = backend push, 'local' = yerel fallback timer */
   source:           'sensor' | 'local'
-  history:          Array<{ status: LightStatus; at: string }>
+  history:          HistoryEntry[]
 }
 
 type LampStateMap = Record<string, LampState>
@@ -64,9 +66,14 @@ const STATUS_COLOR: Record<LightStatus, string> = {
   green:  '#22c55e',
 }
 
-// NEXT_STATUS ve FALLBACK_DURATION kaldırıldı.
-// Durum geçişleri yalnızca backend sensör verisiyle tetiklenir;
-// frontend hiçbir zaman kendi başına renk değiştirmez.
+// ─── Yardımcı: "HH:MM:SS" string'ini milisaniyeye çevir ───────────────────────
+function timeStrToMs(timeStr: string, ref: Date): number {
+  const [h, m, s] = timeStr.split(':').map(Number)
+  const d = new Date(ref)
+  d.setHours(h, m, s, 0)
+  if (d.getTime() > ref.getTime()) d.setDate(d.getDate() - 1) // gece yarısı geçişi
+  return d.getTime()
+}
 
 // ─── Marker DOM ────────────────────────────────────────────────────────────────
 function createLampElement(): HTMLDivElement {
@@ -96,6 +103,7 @@ function createLampElement(): HTMLDivElement {
     `
     inner.appendChild(bulb)
   })
+
   const badge = document.createElement('div')
   badge.className = 'malfunction-badge'
   badge.style.cssText = `
@@ -105,7 +113,6 @@ function createLampElement(): HTMLDivElement {
   `
   inner.appendChild(badge)
 
-  // Sensor kaynak göstergesi (mavi nokta = canlı sensör verisi)
   const srcDot = document.createElement('div')
   srcDot.className = 'source-dot'
   srcDot.style.cssText = `
@@ -135,7 +142,6 @@ function updateLampElement(wrapper: HTMLDivElement, state: LampState) {
   const badge = inner.querySelector<HTMLDivElement>('.malfunction-badge')
   if (badge) badge.style.display = state.isMalfunctioning ? 'block' : 'none'
 
-  // Akıllı kavşak → sensor'dan gelen veri: mavi nokta göster
   const srcDot = inner.querySelector<HTMLDivElement>('.source-dot')
   if (srcDot) srcDot.style.display = state.source === 'sensor' ? 'block' : 'none'
 
@@ -281,16 +287,29 @@ interface PopupInfo {
   dir: string; x: number; y: number
 }
 
+const STATUS_LABEL: Record<LightStatus, string> = {
+  red: 'Kırmızı', green: 'Yeşil', yellow: 'Sarı',
+}
+
 const LampPopup = memo(({
   info, state, onClose,
 }: { info: PopupInfo; state: LampState | undefined; onClose: () => void }) => {
   if (!state) return null
-  const isSmartSource = info.intersectionType === 'semi_smart' && state.source === 'sensor'
+
+  // Aktif fazı geçmişten ayır; son 3 tamamlanmış geçişi göster
+  const completedHistory = state.history
+    .filter(h => h.duration !== 'aktif')
+    .slice(-3)
+    .reverse()
+
+  const activeEntry = state.history.find(h => h.duration === 'aktif')
+
   return (
     <div
       style={{ left: info.x + 14, top: Math.max(10, info.y - 10) }}
       className="absolute z-50 bg-[#0f1117] border border-white/10 rounded-2xl p-4 w-64 shadow-2xl pointer-events-auto"
     >
+      {/* Başlık */}
       <div className="flex justify-between items-start mb-3">
         <div>
           <div className="flex items-center gap-1.5">
@@ -313,40 +332,42 @@ const LampPopup = memo(({
         <span className="w-3 h-3 rounded-full shrink-0"
           style={{ background: STATUS_COLOR[state.status], boxShadow: `0 0 8px ${STATUS_COLOR[state.status]}` }} />
         <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: STATUS_COLOR[state.status] }}>
-          {state.status === 'red' ? 'KIRMIZI' : state.status === 'green' ? 'YEŞİL' : 'SARI'}
+          {STATUS_LABEL[state.status]}
         </span>
         {state.isMalfunctioning && (
-          <span className="text-[9px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded-full animate-pulse">
+          <span className="text-[9px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded-full animate-pulse ml-1">
             ARIZALI
           </span>
         )}
-        <span className="ml-auto text-[13px] font-mono font-bold text-slate-300">{state.timeRemains}s</span>
+        {/* Aktif faz başlangıç saati */}
+        {activeEntry && (
+          <span className="ml-auto text-[9px] font-mono text-slate-500">{activeEntry.enteredAt}</span>
+        )}
       </div>
 
-      {/* Kaynak Bilgisi */}
+      {/* Kaynak */}
       <div className="flex items-center gap-2 mb-3 px-1">
         <span className={`w-1.5 h-1.5 rounded-full ${state.source === 'sensor' ? 'bg-indigo-400' : 'bg-slate-600'}`} />
         <span className="text-[9px] text-slate-500">
-          {state.source === 'sensor'
-            ? isSmartSource ? 'Akıllı sensör verisi (dinamik süre)' : 'Sensör verisi'
-            : 'Yerel fallback timer'}
+          {state.source === 'sensor' ? 'Canlı sensör verisi' : 'Veri bekleniyor…'}
         </span>
       </div>
 
-      {/* Geçmiş */}
-      <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mb-2">Son 3 Değişim</p>
+      {/* Son 3 Tamamlanmış Geçiş */}
+      <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mb-2">Son Geçişler</p>
       <div className="space-y-1.5">
-        {state.history.length === 0 && (
-          <p className="text-[9px] text-slate-700 italic">Henüz değişim yok</p>
+        {completedHistory.length === 0 && (
+          <p className="text-[9px] text-slate-700 italic">Henüz tamamlanan geçiş yok</p>
         )}
-        {[...state.history].reverse().slice(0, 3).map((h, i) => (
+        {completedHistory.map((h, i) => (
           <div key={i} className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full shrink-0"
-              style={{ background: STATUS_COLOR[h.status], opacity: 1 - i * 0.3 }} />
-            <span className="text-[9px] font-mono text-slate-400 uppercase">
-              {h.status === 'red' ? 'Kırmızı' : h.status === 'green' ? 'Yeşil' : 'Sarı'}
+              style={{ background: STATUS_COLOR[h.status], opacity: 1 - i * 0.25 }} />
+            <span className="text-[9px] font-mono text-slate-400">
+              {STATUS_LABEL[h.status]}
             </span>
-            <span className="ml-auto text-[8px] text-slate-600 font-mono">{h.at}</span>
+            <span className="text-[8px] text-slate-600 font-mono">{h.enteredAt}</span>
+            <span className="ml-auto text-[8px] font-mono text-indigo-400/80">{h.duration}</span>
           </div>
         ))}
       </div>
@@ -363,13 +384,12 @@ export default function MapPage() {
   const lampMarkersRef   = useRef<Map<string, { el: HTMLDivElement; marker: maplibregl.Marker }>>(new Map())
   const densityPointsRef = useRef<Map<string, any>>(new Map())
 
+  // timeRemains yok — sensör ne zaman geçeceğini bildirmiyor, biz tahmin etmiyoruz
   const [lampStates, setLampStates] = useState<LampStateMap>(() => {
     const init: LampStateMap = {}
     ALL_LAMPS.forEach(lamp => {
-      const type = lamp.intersectionType
       init[lamp.lampId] = {
         status:           'red',
-        timeRemains:      Math.floor(Math.random() * 30) + 10,
         isMalfunctioning: false,
         source:           'local',
         history:          [],
@@ -377,10 +397,8 @@ export default function MapPage() {
     })
     return init
   })
-  const lampStatesRef = useRef<LampStateMap>(lampStates)
-  useEffect(() => { lampStatesRef.current = lampStates }, [lampStates])
 
-  const { messages, connected } = useWebSocket()
+  const { connected, setOnMessage } = useWebSocket()
   const [violationLogs, setViolationLogs] = useState<any[]>([])
   const [popupInfo, setPopupInfo]         = useState<PopupInfo | null>(null)
   const [lastUpdate, setLastUpdate]       = useState<Date | null>(null)
@@ -448,9 +466,11 @@ export default function MapPage() {
       })
 
       ALL_LAMPS.forEach(lamp => {
-        const el    = createLampElement()
-        const state = lampStatesRef.current[lamp.lampId]
-        updateLampElement(el, state)
+        const el = createLampElement()
+        // İlk render: tüm lambalar local/red — sensör gelince güncellenir
+        updateLampElement(el, {
+          status: 'red', isMalfunctioning: false, source: 'local', history: [],
+        })
 
         el.addEventListener('click', e => {
           const point = mapRef.current!.project([lamp.lng, lamp.lat])
@@ -491,78 +511,66 @@ export default function MapPage() {
     return () => { map.remove(); mapRef.current = null; mapLoadedRef.current = false }
   }, [])
 
-  // ─── Countdown Timer (sadece görsel geri sayım) ───────────────────────────────
-  // Bu timer ASLA renk/durum değiştirmez.
-  // Tek görevi: sensörden gelen timeRemains'i her saniye 1 azaltmak (UI geri sayımı).
-  // Sensör bağlantısı kesilirse sayaç 0'da durur, ışık son bilinen renkte DONAR.
+  // ─── WebSocket: Her mesaj anında işlenir ──────────────────────────────────────
   useEffect(() => {
-    const interval = setInterval(() => {
-      setLampStates(prev => {
-        const next = { ...prev }
-        let changed = false
+    setOnMessage((msg) => {
+      if (!mapLoadedRef.current) return
 
-        Object.keys(next).forEach(id => {
-          const s = next[id]
-          // Sadece timeRemains > 0 olan lamplarda sayacı azalt
-          if (s.timeRemains > 0) {
-            next[id] = { ...s, timeRemains: s.timeRemains - 1 }
-            changed = true
-            // Marker DOM'una dokunmaya gerek yok — sadece timeRemains değişti,
-            // renk/durum aynı kaldı
-          }
-        })
-
-        return changed ? next : prev
-      })
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [])
-
-  // ─── WebSocket: Sensör Verisi (tek otorite) ───────────────────────────────────
-  // messages her flush'ta taze batch — önceki mesajları biriktirmiyor.
-  // useEffect her yeni batch'te tetiklenir, tüm mesajları işler.
-  useEffect(() => {
-    if (messages.length === 0 || !mapLoadedRef.current) return
-
-    setLastUpdate(new Date())
-
-    // Trafik ışığı güncellemelerini tek bir state geçişinde toplu uygula
-    const lampUpdates: Record<string, LampState> = {}
-    const violations: any[] = []
-    let densityChanged = false
-
-    for (const msg of messages) {
+      setLastUpdate(new Date())
       const d = msg.data as any
 
-      // ── Trafik Işığı ──
+      // ── Trafik Işığı ──────────────────────────────────────────────────────
       if (msg.channel === 'city.traffic_lights' && d.lamp_id) {
-        // En güncel state: önce önceki lampUpdates'e bak, yoksa mevcut state'e
-        const existing = lampUpdates[d.lamp_id] ?? lampStatesRef.current[d.lamp_id]
-        if (!existing) continue
+        if (!activeChannelsRef.current['city.traffic_lights']) return
 
-        const incomingStatus = d.status as LightStatus
-        const statusChanged  = existing.status !== incomingStatus
+        setLampStates(prev => {
+          const existing = prev[d.lamp_id]
+          if (!existing) return prev
 
-        const updated: LampState = {
-          status:           incomingStatus,
-          timeRemains:      d.timing_remains ?? 30,
-          isMalfunctioning: d.is_malfunctioning ?? false,
-          source:           'sensor',
-          history: statusChanged
-            ? [...existing.history, { status: existing.status, at: new Date().toLocaleTimeString('tr-TR') }].slice(-10)
-            : existing.history,
-        }
-        lampUpdates[d.lamp_id] = updated
+          const incomingStatus = d.status as LightStatus
+          const statusChanged  = existing.status !== incomingStatus
+          const now            = new Date()
+          const nowStr         = now.toLocaleTimeString('tr-TR')
 
-        // Marker DOM'u anında güncelle (state batch'i beklemeden görsel hız)
-        const marker = lampMarkersRef.current.get(d.lamp_id)
-        if (marker) updateLampElement(marker.el, updated)
+          let newHistory = existing.history
+
+          if (statusChanged) {
+            let updated = [...existing.history]
+
+            // Önceki aktif fazın süresini kapat
+            const lastIdx = updated.findIndex(h => h.duration === 'aktif')
+            if (lastIdx !== -1) {
+              const enteredMs  = timeStrToMs(updated[lastIdx].enteredAt, now)
+              const elapsedSec = Math.round((now.getTime() - enteredMs) / 1000)
+              updated[lastIdx] = { ...updated[lastIdx], duration: `${elapsedSec}s` }
+            }
+
+            // Yeni fazı 'aktif' olarak ekle
+            newHistory = [
+              ...updated,
+              { status: incomingStatus, enteredAt: nowStr, duration: 'aktif' },
+            ].slice(-6) // 6 tut: 3 tamamlanmış + 1 aktif yeter, biraz pay
+          }
+
+          const updated: LampState = {
+            status:           incomingStatus,
+            isMalfunctioning: d.is_malfunctioning ?? false,
+            source:           'sensor',
+            history:          newHistory,
+          }
+
+          // Marker DOM'unu anında güncelle — React state batch'ini bekleme
+          const marker = lampMarkersRef.current.get(d.lamp_id)
+          if (marker) updateLampElement(marker.el, updated)
+
+          return { ...prev, [d.lamp_id]: updated }
+        })
       }
 
-      // ── Hız İhlali ──
+      // ── Hız İhlali ────────────────────────────────────────────────────────
       if (msg.channel === 'city.speed_violations' && activeChannelsRef.current['city.speed_violations']) {
-        violations.push(d)
+        setViolationLogs(prev => [d, ...prev].slice(0, 10))
+
         const el = document.createElement('div')
         el.className = 'radar-effect'
         el.innerHTML = `<div class="p-ring"></div><div class="p-tag">${d.speed}</div>`
@@ -572,28 +580,11 @@ export default function MapPage() {
         setTimeout(() => m.remove(), 4000)
       }
 
-      // ── Yoğunluk Heatmap ──
+      // ── Yoğunluk Heatmap ──────────────────────────────────────────────────
       if (msg.channel === 'city.density' && activeChannelsRef.current['city.density']) {
         densityPointsRef.current.set(d.zone_id, d)
-        densityChanged = true
-      }
-    }
-
-    // Tüm lamp güncellemelerini tek setState ile uygula
-    if (Object.keys(lampUpdates).length > 0) {
-      setLampStates(prev => ({ ...prev, ...lampUpdates }))
-    }
-
-    // İhlalleri toplu ekle
-    if (violations.length > 0) {
-      setViolationLogs(prev => [...violations, ...prev].slice(0, 10))
-    }
-
-    // Heatmap'i bir kez güncelle
-    if (densityChanged) {
-      const source = mapRef.current?.getSource('density-source') as maplibregl.GeoJSONSource
-      if (source) {
-        source.setData({
+        const source = mapRef.current?.getSource('density-source') as maplibregl.GeoJSONSource
+        source?.setData({
           type: 'FeatureCollection',
           features: Array.from(densityPointsRef.current.values()).map(z => ({
             type:       'Feature',
@@ -602,8 +593,8 @@ export default function MapPage() {
           })) as any,
         })
       }
-    }
-  }, [messages])
+    })
+  }, [setOnMessage])
 
   // ─── Popup Konum Takibi ───────────────────────────────────────────────────────
   const handleMapMove = useCallback(() => {

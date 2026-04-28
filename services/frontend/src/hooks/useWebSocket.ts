@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useAuthStore } from '../store/authStore'
 
 export interface LiveMessage {
@@ -8,11 +8,20 @@ export interface LiveMessage {
 
 export function useWebSocket() {
   const token = useAuthStore((s) => s.token)
-  const [messages, setMessages] = useState<LiveMessage[]>([])
+
+  // messages state'i biriktirme → her mesajı callback ile anlık ilet
+  // Böylece 200 mesajlık buffer'ı her render'da yeniden işlemiyoruz
   const [connected, setConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mountedRef = useRef(true)
+
+  // Consumer'lar bu callback'i register eder; her gelen mesajda bir kez çağrılır
+  const onMessageRef = useRef<((msg: LiveMessage) => void) | null>(null)
+
+  const setOnMessage = useCallback((fn: (msg: LiveMessage) => void) => {
+    onMessageRef.current = fn
+  }, [])
 
   const connect = () => {
     if (!token || !mountedRef.current) return
@@ -24,7 +33,6 @@ export function useWebSocket() {
     ws.onopen = () => {
       if (!mountedRef.current) return
       setConnected(true)
-      // Önceki reconnect timer'ı temizle
       if (reconnectTimer.current) {
         clearTimeout(reconnectTimer.current)
         reconnectTimer.current = null
@@ -35,16 +43,16 @@ export function useWebSocket() {
       if (!mountedRef.current) return
       try {
         const msg: LiveMessage = JSON.parse(event.data)
-        setMessages((prev) => [msg, ...prev].slice(0, 200))
+        // Her mesajı anında ilet — biriktirme yok, gereksiz re-render yok
+        onMessageRef.current?.(msg)
       } catch {
-        // ignore
+        // malformed JSON — sessizce geç
       }
     }
 
     ws.onclose = () => {
       if (!mountedRef.current) return
       setConnected(false)
-      // 3 saniye sonra yeniden bağlan
       reconnectTimer.current = setTimeout(() => {
         if (mountedRef.current) connect()
       }, 3000)
@@ -64,7 +72,8 @@ export function useWebSocket() {
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
       wsRef.current?.close()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
-  return { messages, connected }
+  return { connected, setOnMessage }
 }

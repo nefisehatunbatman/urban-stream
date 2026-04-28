@@ -8,14 +8,19 @@ type Location struct {
 	Lng float64 `json:"lng"`
 }
 
-// TrafficLight city:traffic_lights kanalı için veri yapısı
+// TrafficLight city:traffic_lights kanalı için veri yapısı.
+//
+// timing_remains KALDIRILDI.
+// Gerçek sensörler (özellikle akıllı kavşaklar) bir sonraki geçişin ne zaman
+// olacağını önceden bildirmez — sadece "şu an bu duruma geçtim" olayını atar.
+// Frontend yalnızca bu olayı dinler, tahmin yapmaz.
 type TrafficLight struct {
-	LampID           string   `json:"lamp_id"`
-	Status           string   `json:"status"` // green, yellow, red
-	TimingRemains    int      `json:"timing_remains"`
-	IsMalfunctioning bool     `json:"is_malfunctioning"`
-	IntersectionID   string   `json:"intersection_id"`
-	Location         Location `json:"location"`
+	LampID           string    `json:"lamp_id"`
+	IntersectionID   string    `json:"intersection_id"`
+	Status           string    `json:"status"`     // green | yellow | red
+	ChangedAt        time.Time `json:"changed_at"` // geçişin tam zamanı (UTC)
+	IsMalfunctioning bool      `json:"is_malfunctioning"`
+	Location         Location  `json:"location"`
 }
 
 // VehicleTypes araç tiplerinin dağılımını temsil eder

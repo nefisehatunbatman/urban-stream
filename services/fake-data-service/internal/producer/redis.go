@@ -11,69 +11,71 @@ import (
 
 var ctx = context.Background()
 
-// StartProducers her kanal için ayrı bir iş parçacığı (goroutine) başlatır
+// ─── Hedef: her kanaldan 300 msg/s ───────────────────────────────────────────
+//
+// city:traffic_lights  → 10 kavşak goroutine × ~30 olay/s = ~300 msg/s (event-driven)
+//                        4 worker paralel tüketim ile Redis'e yazılır.
+//
+// city:density         → ticker 3.33ms → 300 msg/s
+//
+// city:speed_violations→ ticker 3.33ms → 300 msg/s
+//                        GenerateSpeedViolation() zaten excess>0 garantili,
+//                        eski "speed <= limit" drop kaldırıldı.
+
+const (
+	targetMsgPerSec = 300
+	tickerInterval  = time.Second / targetMsgPerSec // ~3.333ms
+	trafficWorkers  = 4
+)
+
 func StartProducers(rdb *redis.Client) {
-	go produceTrafficLights(rdb)
+	for range trafficWorkers {
+		go publishTrafficLightWorker(rdb)
+	}
 	go produceDensity(rdb)
 	go produceSpeedViolations(rdb)
 }
 
-func produceTrafficLights(rdb *redis.Client) {
-	ticker := time.NewTicker(time.Second / 300) //saniyede 300 veri uretilmesini saglar
+// publishTrafficLightWorker: eventQueue'dan bloklamalı okur.
+// 4 worker → yüksek Redis latency durumunda bile kuyruk boşalmaz.
+func publishTrafficLightWorker(rdb *redis.Client) {
+	for {
+		event := generator.NextTrafficLightEvent()
 
-	defer ticker.Stop()
-	//aslinda burda gizli bir channel var
-	for range ticker.C { //burda da channeli okuduk her tetiklendiginde generatoru cagiriyoruz
-		data := generator.GenerateTrafficLight()
-
-		payload, err := json.Marshal(data)
+		payload, err := json.Marshal(event)
 		if err != nil {
 			continue
 		}
-		//burda ticker sayesinde ve continue sayesinde 3ms sonra tekrar dene diyoruz
-		err = rdb.Publish(ctx, "city:traffic_lights", payload).Err()
-		if err != nil {
-			continue
+		if err := rdb.Publish(ctx, "city:traffic_lights", payload).Err(); err != nil {
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
 }
 
+// produceDensity: ~3.33ms'de bir → 300 msg/s
 func produceDensity(rdb *redis.Client) {
-	ticker := time.NewTicker(time.Second / 300)
+	ticker := time.NewTicker(tickerInterval)
 	defer ticker.Stop()
-	//c channel adında key
+
 	for range ticker.C {
-		data := generator.GenerateDensity()
-
-		payload, err := json.Marshal(data) //structı dbnin anlayabileceği hale çevirdik
+		payload, err := json.Marshal(generator.GenerateDensity())
 		if err != nil {
 			continue
 		}
-
-		err = rdb.Publish(ctx, "city:density", payload).Err()
-		if err != nil {
-			continue
-		}
+		_ = rdb.Publish(ctx, "city:density", payload).Err()
 	}
 }
 
+// produceSpeedViolations: ~3.33ms'de bir → 300 msg/s
 func produceSpeedViolations(rdb *redis.Client) {
-	ticker := time.NewTicker(time.Second / 300)
+	ticker := time.NewTicker(tickerInterval)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		data := generator.GenerateSpeedViolation()
-		//hız ihlali deglse redise yazmiyoruz
-		if data.Speed > data.Limit {
-			payload, err := json.Marshal(data)
-			if err != nil {
-				continue
-			}
-
-			err = rdb.Publish(ctx, "city:speed_violations", payload).Err()
-			if err != nil {
-				continue
-			}
+		payload, err := json.Marshal(generator.GenerateSpeedViolation())
+		if err != nil {
+			continue
 		}
+		_ = rdb.Publish(ctx, "city:speed_violations", payload).Err()
 	}
 }
