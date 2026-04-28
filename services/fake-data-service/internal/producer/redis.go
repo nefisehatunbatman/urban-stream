@@ -23,7 +23,7 @@ func produceTrafficLights(rdb *redis.Client) {
 
 	defer ticker.Stop()
 	//aslinda burda gizli bir channel var
-	for range ticker.C { //burda da channeli okuduk
+	for range ticker.C { //burda da channeli okuduk her tetiklendiginde generatoru cagiriyoruz
 		data := generator.GenerateTrafficLight()
 
 		payload, err := json.Marshal(data)

@@ -50,15 +50,21 @@ func LoadPublicKey(path string) (*rsa.PublicKey, error) {
 func Auth(publicKey *rsa.PublicKey) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Önce header'a bak, sonra query param'a
+			tokenStr := ""
 			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				tokenStr = strings.TrimPrefix(authHeader, "Bearer ")
+			} else {
+				tokenStr = r.URL.Query().Get("token")
+			}
+
+			if tokenStr == "" {
 				pkg.Error(w, http.StatusUnauthorized, "token gerekli")
 				return
 			}
 
-			tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 			claims := &Claims{}
-
 			token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
 				if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
 					return nil, fmt.Errorf("beklenmeyen imzalama metodu")
