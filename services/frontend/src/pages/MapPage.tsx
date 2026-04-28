@@ -64,20 +64,9 @@ const STATUS_COLOR: Record<LightStatus, string> = {
   green:  '#22c55e',
 }
 
-const NEXT_STATUS: Record<LightStatus, LightStatus> = {
-  red: 'green', green: 'yellow', yellow: 'red',
-}
-
-/**
- * Sabit kavşak için yerel fallback süreleri (saniye).
- * Akıllı kavşaklarda bu değerler yalnızca sensor yokken kullanılır;
- * gerçek süreler her zaman backend'den gelir.
- */
-const FALLBACK_DURATION: Record<LightStatus, Record<IntersectionType, number>> = {
-  green:  { fixed: 20, semi_smart: 25 },
-  yellow: { fixed: 5,  semi_smart: 5  },
-  red:    { fixed: 30, semi_smart: 35 },
-}
+// NEXT_STATUS ve FALLBACK_DURATION kaldırıldı.
+// Durum geçişleri yalnızca backend sensör verisiyle tetiklenir;
+// frontend hiçbir zaman kendi başına renk değiştirmez.
 
 // ─── Marker DOM ────────────────────────────────────────────────────────────────
 function createLampElement(): HTMLDivElement {
@@ -374,11 +363,6 @@ export default function MapPage() {
   const lampMarkersRef   = useRef<Map<string, { el: HTMLDivElement; marker: maplibregl.Marker }>>(new Map())
   const densityPointsRef = useRef<Map<string, any>>(new Map())
 
-  // Her lamp için son sensor timestamp'i tutuyoruz.
-  // Eğer son sensor verisinden bu yana >10s geçtiyse local timer devreye girer.
-  const lastSensorTsRef = useRef<Map<string, number>>(new Map())
-  const SENSOR_TIMEOUT_MS = 10_000
-
   const [lampStates, setLampStates] = useState<LampStateMap>(() => {
     const init: LampStateMap = {}
     ALL_LAMPS.forEach(lamp => {
@@ -507,40 +491,25 @@ export default function MapPage() {
     return () => { map.remove(); mapRef.current = null; mapLoadedRef.current = false }
   }, [])
 
-  // ─── Yerel Fallback Timer ─────────────────────────────────────────────────────
-  // Yalnızca sensörden belirli süre veri gelmeyen lamplar için devreye girer.
-  // Sensör verisi gelen lamplara dokunmaz — onlar WebSocket effect'inde güncellenir.
+  // ─── Countdown Timer (sadece görsel geri sayım) ───────────────────────────────
+  // Bu timer ASLA renk/durum değiştirmez.
+  // Tek görevi: sensörden gelen timeRemains'i her saniye 1 azaltmak (UI geri sayımı).
+  // Sensör bağlantısı kesilirse sayaç 0'da durur, ışık son bilinen renkte DONAR.
   useEffect(() => {
     const interval = setInterval(() => {
-      const now = Date.now()
       setLampStates(prev => {
         const next = { ...prev }
         let changed = false
 
         Object.keys(next).forEach(id => {
-          const lastTs = lastSensorTsRef.current.get(id) ?? 0
-          const sensorAlive = (now - lastTs) < SENSOR_TIMEOUT_MS
-
-          // Sensör canlıysa bu lamp'a dokunma
-          if (sensorAlive) return
-
-          const s    = { ...next[id] }
-          const type = LAMP_TYPE_MAP[id] ?? 'fixed'
-
-          if (s.timeRemains > 1) {
-            s.timeRemains -= 1
-          } else {
-            const newStatus   = NEXT_STATUS[s.status]
-            s.history         = [...s.history, { status: s.status, at: new Date().toLocaleTimeString('tr-TR') }].slice(-10)
-            s.status          = newStatus
-            s.timeRemains     = FALLBACK_DURATION[newStatus][type]
+          const s = next[id]
+          // Sadece timeRemains > 0 olan lamplarda sayacı azalt
+          if (s.timeRemains > 0) {
+            next[id] = { ...s, timeRemains: s.timeRemains - 1 }
+            changed = true
+            // Marker DOM'una dokunmaya gerek yok — sadece timeRemains değişti,
+            // renk/durum aynı kaldı
           }
-          s.source = 'local'
-          next[id] = s
-
-          const marker = lampMarkersRef.current.get(id)
-          if (marker) updateLampElement(marker.el, s)
-          changed = true
         })
 
         return changed ? next : prev
@@ -551,60 +520,77 @@ export default function MapPage() {
   }, [])
 
   // ─── WebSocket: Sensör Verisi (tek otorite) ───────────────────────────────────
+  // messages her flush'ta taze batch — önceki mesajları biriktirmiyor.
+  // useEffect her yeni batch'te tetiklenir, tüm mesajları işler.
   useEffect(() => {
     if (messages.length === 0 || !mapLoadedRef.current) return
-    const msg = messages[0]
-    const d   = msg.data as any
 
     setLastUpdate(new Date())
 
-    // ── Trafik Işığı ──
-    // Backend her zaman doğru status + timing_remains gönderir.
-    // Frontend sadece alıp uygular; akıllı kavşakta timing_remains dinamik gelir.
-    if (msg.channel === 'city.traffic_lights' && d.lamp_id) {
-      lastSensorTsRef.current.set(d.lamp_id, Date.now())
+    // Trafik ışığı güncellemelerini tek bir state geçişinde toplu uygula
+    const lampUpdates: Record<string, LampState> = {}
+    const violations: any[] = []
+    let densityChanged = false
 
-      setLampStates(prev => {
-        const existing = prev[d.lamp_id]
-        if (!existing) return prev
+    for (const msg of messages) {
+      const d = msg.data as any
+
+      // ── Trafik Işığı ──
+      if (msg.channel === 'city.traffic_lights' && d.lamp_id) {
+        // En güncel state: önce önceki lampUpdates'e bak, yoksa mevcut state'e
+        const existing = lampUpdates[d.lamp_id] ?? lampStatesRef.current[d.lamp_id]
+        if (!existing) continue
 
         const incomingStatus = d.status as LightStatus
         const statusChanged  = existing.status !== incomingStatus
 
         const updated: LampState = {
           status:           incomingStatus,
-          // timing_remains backend'den her zaman gelir;
-          // fallback olarak FALLBACK_DURATION kullan (connection kopunca)
-          timeRemains:      d.timing_remains ?? FALLBACK_DURATION[incomingStatus][LAMP_TYPE_MAP[d.lamp_id] ?? 'fixed'],
+          timeRemains:      d.timing_remains ?? 30,
           isMalfunctioning: d.is_malfunctioning ?? false,
           source:           'sensor',
           history: statusChanged
             ? [...existing.history, { status: existing.status, at: new Date().toLocaleTimeString('tr-TR') }].slice(-10)
             : existing.history,
         }
+        lampUpdates[d.lamp_id] = updated
 
+        // Marker DOM'u anında güncelle (state batch'i beklemeden görsel hız)
         const marker = lampMarkersRef.current.get(d.lamp_id)
         if (marker) updateLampElement(marker.el, updated)
+      }
 
-        return { ...prev, [d.lamp_id]: updated }
-      })
+      // ── Hız İhlali ──
+      if (msg.channel === 'city.speed_violations' && activeChannelsRef.current['city.speed_violations']) {
+        violations.push(d)
+        const el = document.createElement('div')
+        el.className = 'radar-effect'
+        el.innerHTML = `<div class="p-ring"></div><div class="p-tag">${d.speed}</div>`
+        const m = new maplibregl.Marker({ element: el })
+          .setLngLat([d.location.lng, d.location.lat])
+          .addTo(mapRef.current!)
+        setTimeout(() => m.remove(), 4000)
+      }
+
+      // ── Yoğunluk Heatmap ──
+      if (msg.channel === 'city.density' && activeChannelsRef.current['city.density']) {
+        densityPointsRef.current.set(d.zone_id, d)
+        densityChanged = true
+      }
     }
 
-    // ── Hız İhlali ──
-    if (msg.channel === 'city.speed_violations' && activeChannelsRef.current['city.speed_violations']) {
-      setViolationLogs(prev => [d, ...prev].slice(0, 10))
-      const el = document.createElement('div')
-      el.className = 'radar-effect'
-      el.innerHTML = `<div class="p-ring"></div><div class="p-tag">${d.speed}</div>`
-      const m = new maplibregl.Marker({ element: el })
-        .setLngLat([d.location.lng, d.location.lat])
-        .addTo(mapRef.current!)
-      setTimeout(() => m.remove(), 4000)
+    // Tüm lamp güncellemelerini tek setState ile uygula
+    if (Object.keys(lampUpdates).length > 0) {
+      setLampStates(prev => ({ ...prev, ...lampUpdates }))
     }
 
-    // ── Yoğunluk Heatmap ──
-    if (msg.channel === 'city.density' && activeChannelsRef.current['city.density']) {
-      densityPointsRef.current.set(d.zone_id, d)
+    // İhlalleri toplu ekle
+    if (violations.length > 0) {
+      setViolationLogs(prev => [...violations, ...prev].slice(0, 10))
+    }
+
+    // Heatmap'i bir kez güncelle
+    if (densityChanged) {
       const source = mapRef.current?.getSource('density-source') as maplibregl.GeoJSONSource
       if (source) {
         source.setData({
