@@ -65,10 +65,10 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard title="Ort. Araç Yoğunluğu" value={avgVehicles} subtitle="Son 30 gün" icon="🚗" />
-        <StatCard title="Arıza Oranı" value={`%${avgMalfunction}`} subtitle="Trafik lambaları" icon="🚦" color="text-yellow-400" />
-        <StatCard title="Toplam İhlal" value={totalViolations.toLocaleString()} subtitle="Hız ihlalleri" icon="⚠️" color="text-red-400" />
-        <StatCard title="En Yüksek Hız" value={`${maxSpeed} km/h`} subtitle="Kaydedilen max" icon="💨" color="text-orange-400" />
+        <StatCard title="Ort. Araç Yoğunluğu" value={avgVehicles} subtitle="Son 30 gün"  />
+        <StatCard title="Arıza Oranı" value={`%${avgMalfunction}`} subtitle="Trafik lambaları"  color="text-yellow-400" />
+        <StatCard title="Toplam İhlal" value={totalViolations.toLocaleString()} subtitle="Hız ihlalleri" color="text-red-400" />
+        <StatCard title="En Yüksek Hız" value={`${maxSpeed} km/h`} subtitle="Kaydedilen max" color="text-orange-400" />
       </div>
 
       <div className="flex gap-2">
@@ -80,7 +80,7 @@ export default function DashboardPage() {
               activeTab === tab ? 'bg-primary text-white' : 'bg-dark-700 text-slate-400 hover:text-white'
             }`}
           >
-            {tab === 'density' ? '🚗 Yoğunluk' : tab === 'traffic' ? '🚦 Trafik Lambası' : '⚠️ Hız İhlali'}
+            {tab === 'density' ? 'Yoğunluk' : tab === 'traffic' ? ' Trafik Lambası' : ' Hız İhlali'}
           </button>
         ))}
       </div>
@@ -134,7 +134,7 @@ export default function DashboardPage() {
 
       {predictions.length > 0 && (
         <div className="bg-dark-800 rounded-xl p-5 border border-dark-600">
-          <h3 className="text-white font-medium mb-1">🤖 AI Tahminleri — Araç Yoğunluğu</h3>
+          <h3 className="text-white font-medium mb-1">AI Tahminleri — Araç Yoğunluğu</h3>
           <p className="text-slate-500 text-xs mb-4">Prophet modeli ile üretilen 14 günlük projeksiyon</p>
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={predictions}>

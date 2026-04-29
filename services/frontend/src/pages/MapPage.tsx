@@ -1,7 +1,11 @@
+// MapPage.tsx
 import { useEffect, useRef, useState, useCallback, memo } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { useWebSocket } from '../hooks/useWebSocket'
+import { DeckGL } from '@deck.gl/react'
+import { MapboxOverlay } from '@deck.gl/mapbox'          // MapLibre uyumlu overlay
+import { HeatmapLayer } from '@deck.gl/aggregation-layers'
+import { useMqtt } from '../hooks/useMqtt'
 
 // ─── Sabit Veriler ─────────────────────────────────────────────────────────────
 const KONYA_CENTER: [number, number] = [32.492, 37.871]
@@ -37,12 +41,10 @@ const ALL_LAMPS = INTERSECTIONS.flatMap(inter =>
 // ─── Tipler ────────────────────────────────────────────────────────────────────
 type LightStatus = 'red' | 'yellow' | 'green'
 
-// Her history girdisi: hangi duruma girildi, ne zaman, ne kadar sürdü.
-// 'aktif' → hâlâ bu fazda, henüz bitmedi.
 interface HistoryEntry {
   status:    LightStatus
-  enteredAt: string // "14:32:07"
-  duration:  string // "23s" veya "aktif"
+  enteredAt: string
+  duration:  string
 }
 
 interface LampState {
@@ -53,6 +55,12 @@ interface LampState {
 }
 
 type LampStateMap = Record<string, LampState>
+
+// ── Density noktası: deck.gl HeatmapLayer'ın beklediği şekil ─────────────────
+interface DensityPoint {
+  position: [number, number]   // [lng, lat]
+  weight:   number             // vehicle_count → normalize edilmiş
+}
 
 type ActiveChannels = {
   'city.density':          boolean
@@ -66,12 +74,12 @@ const STATUS_COLOR: Record<LightStatus, string> = {
   green:  '#22c55e',
 }
 
-// ─── Yardımcı: "HH:MM:SS" string'ini milisaniyeye çevir ───────────────────────
+// ─── Yardımcı ─────────────────────────────────────────────────────────────────
 function timeStrToMs(timeStr: string, ref: Date): number {
   const [h, m, s] = timeStr.split(':').map(Number)
   const d = new Date(ref)
   d.setHours(h, m, s, 0)
-  if (d.getTime() > ref.getTime()) d.setDate(d.getDate() - 1) // gece yarısı geçişi
+  if (d.getTime() > ref.getTime()) d.setDate(d.getDate() - 1)
   return d.getTime()
 }
 
@@ -154,7 +162,7 @@ function updateLampElement(wrapper: HTMLDivElement, state: LampState) {
   }
 }
 
-// ─── Alt Bileşenler ────────────────────────────────────────────────────────────
+// ─── Alt Bileşenler (değişmedi) ────────────────────────────────────────────────
 const LayerToggle = memo(({
   active, onClick, color, icon, label,
 }: {
@@ -296,7 +304,6 @@ const LampPopup = memo(({
 }: { info: PopupInfo; state: LampState | undefined; onClose: () => void }) => {
   if (!state) return null
 
-  // Aktif fazı geçmişten ayır; son 3 tamamlanmış geçişi göster
   const completedHistory = state.history
     .filter(h => h.duration !== 'aktif')
     .slice(-3)
@@ -309,7 +316,6 @@ const LampPopup = memo(({
       style={{ left: info.x + 14, top: Math.max(10, info.y - 10) }}
       className="absolute z-50 bg-[#0f1117] border border-white/10 rounded-2xl p-4 w-64 shadow-2xl pointer-events-auto"
     >
-      {/* Başlık */}
       <div className="flex justify-between items-start mb-3">
         <div>
           <div className="flex items-center gap-1.5">
@@ -327,7 +333,6 @@ const LampPopup = memo(({
         <button onClick={onClose} className="text-slate-600 hover:text-white text-xs ml-3 shrink-0">✕</button>
       </div>
 
-      {/* Mevcut Durum */}
       <div className="flex items-center gap-2 mb-3 bg-white/3 rounded-xl px-3 py-2">
         <span className="w-3 h-3 rounded-full shrink-0"
           style={{ background: STATUS_COLOR[state.status], boxShadow: `0 0 8px ${STATUS_COLOR[state.status]}` }} />
@@ -339,13 +344,11 @@ const LampPopup = memo(({
             ARIZALI
           </span>
         )}
-        {/* Aktif faz başlangıç saati */}
         {activeEntry && (
           <span className="ml-auto text-[9px] font-mono text-slate-500">{activeEntry.enteredAt}</span>
         )}
       </div>
 
-      {/* Kaynak */}
       <div className="flex items-center gap-2 mb-3 px-1">
         <span className={`w-1.5 h-1.5 rounded-full ${state.source === 'sensor' ? 'bg-indigo-400' : 'bg-slate-600'}`} />
         <span className="text-[9px] text-slate-500">
@@ -353,7 +356,6 @@ const LampPopup = memo(({
         </span>
       </div>
 
-      {/* Son 3 Tamamlanmış Geçiş */}
       <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mb-2">Son Geçişler</p>
       <div className="space-y-1.5">
         {completedHistory.length === 0 && (
@@ -363,9 +365,7 @@ const LampPopup = memo(({
           <div key={i} className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full shrink-0"
               style={{ background: STATUS_COLOR[h.status], opacity: 1 - i * 0.25 }} />
-            <span className="text-[9px] font-mono text-slate-400">
-              {STATUS_LABEL[h.status]}
-            </span>
+            <span className="text-[9px] font-mono text-slate-400">{STATUS_LABEL[h.status]}</span>
             <span className="text-[8px] text-slate-600 font-mono">{h.enteredAt}</span>
             <span className="ml-auto text-[8px] font-mono text-indigo-400/80">{h.duration}</span>
           </div>
@@ -381,24 +381,27 @@ export default function MapPage() {
   const mapRef       = useRef<maplibregl.Map | null>(null)
   const mapLoadedRef = useRef(false)
 
-  const lampMarkersRef   = useRef<Map<string, { el: HTMLDivElement; marker: maplibregl.Marker }>>(new Map())
-  const densityPointsRef = useRef<Map<string, any>>(new Map())
+  // ── Deck.gl overlay ref ──────────────────────────────────────────────────────
+  // MapboxOverlay, MapLibre'nin addControl API'siyle entegre olur;
+  // deck.gl canvas'ı haritanın kendi WebGL context'i üzerinde çalışır.
+  const deckOverlayRef = useRef<MapboxOverlay | null>(null)
 
-  // timeRemains yok — sensör ne zaman geçeceğini bildirmiyor, biz tahmin etmiyoruz
+  const lampMarkersRef = useRef<Map<string, { el: HTMLDivElement; marker: maplibregl.Marker }>>(new Map())
+
+  // Density verisi artık GeoJSON değil, düz dizi — HeatmapLayer için
+  const densityPointsRef = useRef<Map<string, DensityPoint>>(new Map())
+
   const [lampStates, setLampStates] = useState<LampStateMap>(() => {
     const init: LampStateMap = {}
     ALL_LAMPS.forEach(lamp => {
       init[lamp.lampId] = {
-        status:           'red',
-        isMalfunctioning: false,
-        source:           'local',
-        history:          [],
+        status: 'red', isMalfunctioning: false, source: 'local', history: [],
       }
     })
     return init
   })
 
-  const { connected, setOnMessage } = useWebSocket()
+  const { connected, setOnMessage } = useMqtt()
   const [violationLogs, setViolationLogs] = useState<any[]>([])
   const [popupInfo, setPopupInfo]         = useState<PopupInfo | null>(null)
   const [lastUpdate, setLastUpdate]       = useState<Date | null>(null)
@@ -411,23 +414,56 @@ export default function MapPage() {
   const activeChannelsRef = useRef(activeChannels)
   useEffect(() => { activeChannelsRef.current = activeChannels }, [activeChannels])
 
+  // ─── Deck.gl HeatmapLayer'ı güncelle ─────────────────────────────────────────
+  // Her density verisi geldiğinde çağrılır; overlay zaten mount edilmiş olmalı.
+  const updateDeckHeatmap = useCallback((visible: boolean) => {
+    if (!deckOverlayRef.current) return
+
+    const points = Array.from(densityPointsRef.current.values())
+
+    const layer = visible && points.length > 0
+      ? new HeatmapLayer<DensityPoint>({
+          id:            'density-heatmap',
+          data:          points,
+          getPosition:   d => d.position,
+          getWeight:     d => d.weight,
+          // renk rampalası: düşük→mavi, orta→sarı, yüksek→kırmızı
+          colorRange: [
+            [59,  130, 246, 80],   // mavi
+            [253, 224, 71,  160],  // sarı
+            [249, 115, 22,  200],  // turuncu
+            [239, 68,  68,  255],  // kırmızı
+          ],
+          radiusPixels:  40,
+          intensity:     1.5,
+          threshold:     0.05,
+          pickable:      false,
+        })
+      : null
+
+    deckOverlayRef.current.setProps({
+      layers: layer ? [layer] : [],
+    })
+  }, [])
+
   const toggleChannel = useCallback((ch: keyof ActiveChannels) => {
     setActiveChannels(prev => {
       const next = { ...prev, [ch]: !prev[ch] }
+
       if (ch === 'city.traffic_lights') {
         lampMarkersRef.current.forEach(({ el }) => {
           el.style.visibility = next['city.traffic_lights'] ? 'visible' : 'hidden'
         })
       }
-      if (ch === 'city.density' && mapRef.current?.isStyleLoaded()) {
-        mapRef.current.setLayoutProperty(
-          'density-heatmap', 'visibility',
-          next['city.density'] ? 'visible' : 'none'
-        )
+
+      // Density toggle: overlay'i göster/gizle
+      if (ch === 'city.density') {
+        updateDeckHeatmap(next['city.density'])
       }
+
       return next
     })
-  }, [])
+  }, [updateDeckHeatmap])
 
   // ─── Harita Başlatma ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -443,37 +479,26 @@ export default function MapPage() {
     mapRef.current = map
 
     map.on('load', () => {
-      map.addSource('density-source', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      })
-      map.addLayer({
-        id: 'density-heatmap', type: 'heatmap', source: 'density-source',
-        paint: {
-          'heatmap-weight':    ['interpolate', ['linear'], ['get', 'vehicle_count'], 0, 0, 250, 1],
-          'heatmap-intensity': 1.5,
-          'heatmap-radius':    ['interpolate', ['linear'], ['zoom'], 10, 15, 14, 35],
-          'heatmap-opacity':   0.6,
-          'heatmap-color': [
-            'interpolate', ['linear'], ['heatmap-density'],
-            0,   'rgba(59,130,246,0)',
-            0.3, '#3b82f6',
-            0.5, '#fde047',
-            0.8, '#f97316',
-            1,   '#ef4444',
-          ],
-        },
-      })
 
+      // ── Deck.gl MapboxOverlay ─────────────────────────────────────────────
+      // interleaved: false → deck.gl canvas harita canvas'ının üstüne bindirme
+      // (interleaved: true olursa MapLibre layer sırası gerekir, daha karmaşık)
+      const overlay = new MapboxOverlay({
+        interleaved: false,
+        layers: [],    // başlangıçta boş; veri gelince updateDeckHeatmap çağrılır
+      })
+      deckOverlayRef.current = overlay
+      map.addControl(overlay as any)   // MapboxOverlay IControl arayüzünü implement eder
+
+      // ── Trafik ışığı marker'ları (değişmedi) ─────────────────────────────
       ALL_LAMPS.forEach(lamp => {
         const el = createLampElement()
-        // İlk render: tüm lambalar local/red — sensör gelince güncellenir
         updateLampElement(el, {
           status: 'red', isMalfunctioning: false, source: 'local', history: [],
         })
 
         el.addEventListener('click', e => {
-          const point = mapRef.current!.project([lamp.lng, lamp.lat])
+          const point = map.project([lamp.lng, lamp.lat])
           setPopupInfo({
             lampId:           lamp.lampId,
             intersectionName: lamp.intersectionName,
@@ -508,12 +533,23 @@ export default function MapPage() {
 
     map.on('click', () => setPopupInfo(null))
 
-    return () => { map.remove(); mapRef.current = null; mapLoadedRef.current = false }
-  }, [])
+    return () => {
+      // Önce overlay'i kaldır, sonra haritayı yok et
+      if (deckOverlayRef.current) {
+        map.removeControl(deckOverlayRef.current as any)
+        deckOverlayRef.current = null
+      }
+      map.remove()
+      mapRef.current    = null
+      mapLoadedRef.current = false
+    }
+  }, [])  // eslint-disable-line react-hooks/exhaustive-deps
+  //   updateDeckHeatmap kasıtlı olarak bağımlılıktan çıkarıldı:
+  //   map.on('load') sadece bir kere çalışır; overlay ref üzerinden erişilir.
 
-  // ─── WebSocket: Her mesaj anında işlenir ──────────────────────────────────────
+  // ─── WebSocket ────────────────────────────────────────────────────────────────
   useEffect(() => {
-    setOnMessage((msg) => {
+    setOnMessage(msg => {
       if (!mapLoadedRef.current) return
 
       setLastUpdate(new Date())
@@ -536,34 +572,29 @@ export default function MapPage() {
 
           if (statusChanged) {
             let updated = [...existing.history]
-
-            // Önceki aktif fazın süresini kapat
             const lastIdx = updated.findIndex(h => h.duration === 'aktif')
             if (lastIdx !== -1) {
               const enteredMs  = timeStrToMs(updated[lastIdx].enteredAt, now)
               const elapsedSec = Math.round((now.getTime() - enteredMs) / 1000)
               updated[lastIdx] = { ...updated[lastIdx], duration: `${elapsedSec}s` }
             }
-
-            // Yeni fazı 'aktif' olarak ekle
             newHistory = [
               ...updated,
               { status: incomingStatus, enteredAt: nowStr, duration: 'aktif' },
-            ].slice(-6) // 6 tut: 3 tamamlanmış + 1 aktif yeter, biraz pay
+            ].slice(-6)
           }
 
-          const updated: LampState = {
+          const updatedState: LampState = {
             status:           incomingStatus,
             isMalfunctioning: d.is_malfunctioning ?? false,
             source:           'sensor',
             history:          newHistory,
           }
 
-          // Marker DOM'unu anında güncelle — React state batch'ini bekleme
           const marker = lampMarkersRef.current.get(d.lamp_id)
-          if (marker) updateLampElement(marker.el, updated)
+          if (marker) updateLampElement(marker.el, updatedState)
 
-          return { ...prev, [d.lamp_id]: updated }
+          return { ...prev, [d.lamp_id]: updatedState }
         })
       }
 
@@ -580,23 +611,20 @@ export default function MapPage() {
         setTimeout(() => m.remove(), 4000)
       }
 
-      // ── Yoğunluk Heatmap ──────────────────────────────────────────────────
+      // ── Yoğunluk → Deck.gl HeatmapLayer ──────────────────────────────────
       if (msg.channel === 'city.density' && activeChannelsRef.current['city.density']) {
-        densityPointsRef.current.set(d.zone_id, d)
-        const source = mapRef.current?.getSource('density-source') as maplibregl.GeoJSONSource
-        source?.setData({
-          type: 'FeatureCollection',
-          features: Array.from(densityPointsRef.current.values()).map(z => ({
-            type:       'Feature',
-            geometry:   { type: 'Point', coordinates: [z.location.lng, z.location.lat] },
-            properties: { vehicle_count: z.vehicle_count },
-          })) as any,
+        // Mevcut zone'u güncelle; weight 0-1 aralığına normalize et (max ≈ 250)
+        densityPointsRef.current.set(d.zone_id, {
+          position: [d.location.lng, d.location.lat],
+          weight:   Math.min(1, d.vehicle_count / 250),
         })
+        // Overlay layer'ını güncel veri kümesiyle yeniden oluştur
+        updateDeckHeatmap(activeChannelsRef.current['city.density'])
       }
     })
-  }, [setOnMessage])
+  }, [setOnMessage, updateDeckHeatmap])
 
-  // ─── Popup Konum Takibi ───────────────────────────────────────────────────────
+  // ─── Popup konum takibi ───────────────────────────────────────────────────────
   const handleMapMove = useCallback(() => {
     if (!popupInfo || !mapRef.current) return
     const lamp = ALL_LAMPS.find(l => l.lampId === popupInfo.lampId)
@@ -631,7 +659,6 @@ export default function MapPage() {
           <p className="text-[9px] text-slate-600 uppercase tracking-widest mt-0.5">Konya · Canlı İzleme</p>
         </div>
 
-        {/* Bağlantı Durumu */}
         <div className="bg-white/3 border border-white/5 rounded-xl px-3 py-2.5 space-y-1.5">
           <div className="flex items-center gap-2">
             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
@@ -655,29 +682,15 @@ export default function MapPage() {
           </div>
         </div>
 
-        {/* Katman Kontrolleri */}
         <div>
           <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mb-2">Katmanlar</p>
           <div className="space-y-1.5">
-            <LayerToggle
-              active={activeChannels['city.traffic_lights']}
-              onClick={() => toggleChannel('city.traffic_lights')}
-              color="#6366f1" icon="🚦" label="Trafik Işıkları"
-            />
-            <LayerToggle
-              active={activeChannels['city.density']}
-              onClick={() => toggleChannel('city.density')}
-              color="#f97316" icon="🔥" label="Araç Yoğunluğu"
-            />
-            <LayerToggle
-              active={activeChannels['city.speed_violations']}
-              onClick={() => toggleChannel('city.speed_violations')}
-              color="#ef4444" icon="🚨" label="Hız İhlalleri"
-            />
+            <LayerToggle active={activeChannels['city.traffic_lights']} onClick={() => toggleChannel('city.traffic_lights')} color="#6366f1" label="Trafik Işıkları" />
+            <LayerToggle active={activeChannels['city.density']}        onClick={() => toggleChannel('city.density')}        color="#f97316" label="Araç Yoğunluğu" />
+            <LayerToggle active={activeChannels['city.speed_violations']} onClick={() => toggleChannel('city.speed_violations')} color="#ef4444" label="Hız İhlalleri" />
           </div>
         </div>
 
-        {/* Işık Özeti */}
         <div>
           <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mb-2">Işık Durumu</p>
           <div className="grid grid-cols-3 gap-2">

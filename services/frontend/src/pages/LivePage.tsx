@@ -1,4 +1,4 @@
-import { useWebSocket } from '../hooks/useWebSocket'
+import { useMqtt } from '../hooks/useMqtt'
 
 const channelColors: Record<string, string> = {
   'city.density': 'text-indigo-400',
@@ -7,13 +7,13 @@ const channelColors: Record<string, string> = {
 }
 
 const channelLabels: Record<string, string> = {
-  'city.density': '🚗 Yoğunluk',
-  'city.traffic_lights': '🚦 Trafik Lambası',
-  'city.speed_violations': '⚠️ Hız İhlali',
+  'city.density': 'Yoğunluk',
+  'city.traffic_lights': 'Trafik Lambası',
+  'city.speed_violations': 'Hız İhlali',
 }
 
 export default function LivePage() {
-  const { messages, connected } = useWebSocket()
+  const { messages, connected } = useMqtt()
 
   return (
     <div className="p-6 space-y-6">

@@ -31,6 +31,34 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
+  # ── EMQX MQTT Broker ────────────────────────────────────────────────────────
+  # Kafka → MQTT bridge için native plugin kullanılır.
+  # emqx.conf dosyası proje kökünde deployments/emqx.conf olarak oluşturulmalı.
+  emqx:
+    image: emqx/emqx:5.6
+    container_name: urban-emqx
+    depends_on:
+      - kafka
+    ports:
+      - "1883:1883"    # MQTT (ileride backend-to-broker için)
+      - "8083:8083"    # MQTT over WebSocket — frontend buna bağlanır
+      - "18083:18083"  # EMQX yönetim paneli (tarayıcıdan açılır)
+    environment:
+      EMQX_NAME: urban-emqx
+      EMQX_HOST: 127.0.0.1
+      # Dashboard varsayılan kullanıcı: admin / public
+      # Üretimde mutlaka değiştir
+      EMQX_DASHBOARD__DEFAULT_USERNAME: admin
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: urban123
+    volumes:
+      - ./emqx.conf:/opt/emqx/etc/emqx.conf:ro
+      - emqx_data:/opt/emqx/data
+    healthcheck:
+      test: ["CMD", "/opt/emqx/bin/emqx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   fake-data-service:
     build:
       context: ../services/fake-data-service
@@ -55,6 +83,19 @@ services:
     environment:
       - REDIS_URL=urban-redis:6379
       - KAFKA_BROKER=kafka:9092
+      
+  mqtt-bridge:
+      build:
+        context: ../services/mqtt-bridge
+        dockerfile: deployments/Dockerfile
+      container_name: urban-mqtt-bridge
+      depends_on:
+        - kafka
+        - emqx
+      environment:
+        - KAFKA_BROKER=kafka:9092
+        - MQTT_BROKER=tcp://urban-emqx:1883
+      restart: unless-stopped      
 
   clickhouse:
     image: clickhouse/clickhouse-server:latest
@@ -179,3 +220,4 @@ services:
 volumes:
   clickhouse_data:
   postgres_data:
+  emqx_data:    # EMQX kalıcı veri (session, retained msg vs.)

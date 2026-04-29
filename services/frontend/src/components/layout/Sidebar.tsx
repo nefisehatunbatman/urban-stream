@@ -2,10 +2,10 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 
 const navItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: '📊', permission: 'view_stats' },
-  { path: '/live', label: 'Canlı Akış', icon: '📡', permission: 'view_stats' },
-  { path: '/map', label: 'Harita', icon: '🗺️', permission: 'view_map' },
-  { path: '/users', label: 'Kullanıcılar', icon: '👥', permission: 'manage_users' },
+  { path: '/dashboard', label: 'Dashboard',  permission: 'view_stats' },
+  { path: '/live', label: 'Canlı Akış',  permission: 'view_stats' },
+  { path: '/map', label: 'Harita',  permission: 'view_map' },
+  { path: '/users', label: 'Kullanıcılar',  permission: 'manage_users' },
 ]
 
 export default function Sidebar() {
@@ -21,7 +21,7 @@ export default function Sidebar() {
     <aside className="w-64 min-h-screen bg-dark-800 border-r border-dark-600 flex flex-col">
       {/* Logo */}
       <div className="p-6 border-b border-dark-600">
-        <h1 className="text-xl font-bold text-white">🏙️ UrbanStream</h1>
+        <h1 className="text-xl font-bold text-white">UrbanStream</h1>
         <p className="text-xs text-slate-400 mt-1">Kentsel Veri Analitiği</p>
       </div>
 
@@ -41,7 +41,6 @@ export default function Sidebar() {
                 }`
               }
             >
-              <span>{item.icon}</span>
               <span>{item.label}</span>
             </NavLink>
           )
