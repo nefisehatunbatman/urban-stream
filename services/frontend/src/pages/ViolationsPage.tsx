@@ -127,14 +127,35 @@ export default function ViolationsPage({ onNavigate }: ViolationsPageProps) {
 
   const uiPendingRef  = useRef<Violation[]>([])
 
-  const { connected, setOnMessage } = useMqtt(['city/konya/speed_violations'])
+  // State önce tanımlanmalı — useMqtt'ye paused geçilecek
   const [ui, dispatch] = useReducer(uiReducer, initialUI)
   const [paused, setPaused] = useState(false)
   const pausedRef = useRef(false)
 
-  const handleToggle = useCallback(() => {
-    setPaused(p => { pausedRef.current = !p; return !p })
+  // paused=true → boş dizi → broker'dan unsubscribe
+  const { connected, setOnMessage } = useMqtt(paused ? [] : ['city/konya/speed_violations'])
+
+  const clearMapAndBuffer = useCallback(() => {
+    // Bekleyen timer'ları iptal et
+    if (mapTimerRef.current) { clearTimeout(mapTimerRef.current); mapTimerRef.current = null }
+    if (uiTimerRef.current)  { clearTimeout(uiTimerRef.current);  uiTimerRef.current  = null }
+    // Ring buffer sıfırla
+    cursorRef.current = 0
+    countRef.current  = 0
+    uiPendingRef.current = []
+    // Haritayı temizle
+    const src = mapRef.current?.getSource('violations') as maplibregl.GeoJSONSource | undefined
+    src?.setData({ type: 'FeatureCollection', features: [] })
   }, [])
+
+  const handleToggle = useCallback(() => {
+    setPaused(p => {
+      const next = !p
+      pausedRef.current = next
+      if (next) clearMapAndBuffer()   // durdurulduğunda temizle
+      return next
+    })
+  }, [clearMapAndBuffer])
 
   const flushMap = useCallback(() => {
     mapTimerRef.current = null
