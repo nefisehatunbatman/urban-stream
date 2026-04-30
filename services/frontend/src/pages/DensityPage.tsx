@@ -26,32 +26,37 @@ interface ZoneStat {
   updatedAt:     string
 }
 
-// Sabit renk dizisi — her render'da yeni array oluşturulmasın
-const HEATMAP_COLORS: [number,number,number,number][] = [
+// Sabit renk dizisi — her render'da yeni array yaratılmaz
+const HEATMAP_COLORS: [number, number, number, number][] = [
   [59,  130, 246, 80 ],
   [253, 224, 71,  160],
   [249, 115, 22,  200],
   [239, 68,  68,  255],
 ]
 
-// Layer'ı bir kez oluştur, data değişince sadece data prop'u değişir.
-// deck.gl aynı id'li layer'ı diff'ler → WebGL buffer'ı tam yeniden yüklemez.
-function makHeatmapLayer(data: DensityPoint[]) {
+// getPosition / getWeight accessor'ları sabit ref olarak dışarıda tanımla.
+// deck.gl bunları her setProps'ta karşılaştırır; inline arrow → her seferinde
+// yeni referans → katman tam yeniden build edilir.
+const getPosition = (d: DensityPoint) => d.position
+const getWeight   = (d: DensityPoint) => d.weight
+
+function makeHeatmapLayer(data: DensityPoint[]) {
   return new HeatmapLayer<DensityPoint>({
-    id:          'density-heatmap',   // id sabit kalmalı
+    id:           'density-heatmap',   // id sabit → deck.gl diff yapar
     data,
-    getPosition: (d: DensityPoint) => d.position,
-    getWeight:   (d: DensityPoint) => d.weight,
-    colorRange:  HEATMAP_COLORS,
+    getPosition,                       // sabit ref
+    getWeight,                         // sabit ref
+    colorRange:   HEATMAP_COLORS,      // sabit ref
     radiusPixels: 40,
     intensity:    1.5,
     threshold:    0.05,
     pickable:     false,
-    updateTriggers: { getWeight: data.length }, // sadece uzunluk değişince trigger
+    // updateTriggers kaldırıldı — data referansı değişince deck.gl zaten diff yapar.
+    // Sahte trigger eklemek her seferinde GPU buffer'ı yeniden yükletir.
   })
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Sub-components ─────────────────────────────────────────────────────────────
 
 const StreamToggle = memo(({ paused, onToggle }: { paused: boolean; onToggle: () => void }) => (
   <button
@@ -72,15 +77,19 @@ const ZoneCard = memo(({ z, color, label }: { z: ZoneStat; color: string; label:
   <div className="bg-white/3 border border-white/5 rounded-xl px-2.5 py-2">
     <div className="flex items-center justify-between mb-1">
       <span className="text-[9px] font-mono text-slate-400">{z.zone_id}</span>
-      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
-        style={{ background: `${color}20`, color }}>
+      <span
+        className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
+        style={{ background: `${color}20`, color }}
+      >
         {label}
       </span>
     </div>
     <div className="flex items-center gap-2">
       <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${Math.min(100, z.vehicle_count / 2.5)}%`, background: color }} />
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${Math.min(100, z.vehicle_count / 2.5)}%`, background: color }}
+        />
       </div>
       <span className="text-[9px] font-black shrink-0" style={{ color }}>{z.vehicle_count}</span>
     </div>
@@ -95,7 +104,7 @@ function getDensityLevel(count: number) {
   return                  { label: 'Kritik', color: '#ef4444' }
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+// ── Page ───────────────────────────────────────────────────────────────────────
 
 interface DensityPageProps { onNavigate: (page: Page) => void }
 
@@ -107,9 +116,12 @@ export default function DensityPage({ onNavigate }: DensityPageProps) {
 
   const densityPointsRef = useRef<Map<string, DensityPoint>>(new Map())
   const pendingZonesRef  = useRef<Map<string, ZoneStat>>(new Map())
-  const heatmapDirtyRef  = useRef(false)   // "güncelleme gerekiyor" flag'i
+  const heatmapDirtyRef  = useRef(false)
   const heatmapTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
   const uiTimerRef       = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Önceki points array'ini ref'de sakla — değişmediyse aynı referansı ver
+  const prevPointsRef = useRef<DensityPoint[]>([])
 
   const { connected, setOnMessage } = useMqtt(['city/konya/density'])
   const [zoneStats,     setZoneStats    ] = useState<ZoneStat[]>([])
@@ -122,36 +134,38 @@ export default function DensityPage({ onNavigate }: DensityPageProps) {
     setPaused(prev => { pausedRef.current = !prev; return !prev })
   }, [])
 
-  // Heatmap flush — deck.gl diff sayesinde sadece değişen noktalar GPU'ya gider
   const flushHeatmap = useCallback(() => {
     heatmapTimerRef.current = null
     if (!deckOverlayRef.current || !heatmapDirtyRef.current) return
     heatmapDirtyRef.current = false
 
-    // Aynı array referansı verilirse deck.gl diff yapmaz — slice ile yeni ref ver
+    // Array.from — yeni ref → deck.gl diff tetiklenir
     const points = Array.from(densityPointsRef.current.values())
-    deckOverlayRef.current.setProps({ layers: [makHeatmapLayer(points)] })
+    prevPointsRef.current = points
+    deckOverlayRef.current.setProps({ layers: [makeHeatmapLayer(points)] })
   }, [])
 
-  // UI flush — zone listesi + toplam araç (tek render)
   const flushUI = useCallback(() => {
     uiTimerRef.current = null
     const zones = Array.from(pendingZonesRef.current.values())
     if (!zones.length) return
 
+    // pending temizle önce — yeni mesajlar birikmeden silinir
+    pendingZonesRef.current.clear()
+
     setZoneStats(prev => {
       const map = new Map(prev.map(z => [z.zone_id, z]))
-      zones.forEach(z => map.set(z.zone_id, z))
+      for (const z of zones) map.set(z.zone_id, z)
       const sorted = Array.from(map.values()).sort((a, b) => b.vehicle_count - a.vehicle_count)
+      // totalVehicles hesabını ayrı state güncellemesine bölme —
+      // tek render içinde yap (callback içinden setState çağrısı batch'lenir)
       setTotalVehicles(sorted.reduce((s, z) => s + z.vehicle_count, 0))
       return sorted
     })
     setLastUpdate(new Date())
-    // Flush sonrası pending'i temizle (sadece işlenen veriler)
-    zones.forEach(z => pendingZonesRef.current.delete(z.zone_id))
   }, [])
 
-  // ── Harita ────────────────────────────────────────────────────────────────
+  // ── Harita ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
 
@@ -165,10 +179,9 @@ export default function DensityPage({ onNavigate }: DensityPageProps) {
     mapRef.current = map
 
     map.on('load', () => {
-      // Overlay'i boş layer ile başlat — ilk veri gelince doldurulur
       const overlay = new MapboxOverlay({
         interleaved: false,
-        layers:      [makHeatmapLayer([])],
+        layers:      [makeHeatmapLayer([])],
       })
       deckOverlayRef.current = overlay
       map.addControl(overlay as any)
@@ -183,12 +196,12 @@ export default function DensityPage({ onNavigate }: DensityPageProps) {
         deckOverlayRef.current = null
       }
       map.remove()
-      mapRef.current    = null
+      mapRef.current       = null
       mapLoadedRef.current = false
     }
   }, [])
 
-  // ── MQTT ──────────────────────────────────────────────────────────────────
+  // ── MQTT ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     setOnMessage(msg => {
       if (!mapLoadedRef.current)          return
@@ -209,7 +222,7 @@ export default function DensityPage({ onNavigate }: DensityPageProps) {
         updatedAt:     new Date().toLocaleTimeString('tr-TR'),
       })
 
-      heatmapDirtyRef.current = true   // değişiklik var, flush gerekiyor
+      heatmapDirtyRef.current = true
 
       if (!heatmapTimerRef.current)
         heatmapTimerRef.current = setTimeout(flushHeatmap, HEATMAP_UPDATE_MS)
@@ -218,6 +231,7 @@ export default function DensityPage({ onNavigate }: DensityPageProps) {
     })
   }, [setOnMessage, flushHeatmap, flushUI])
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex h-screen bg-[#0a0b0e] overflow-hidden select-none text-white">
       <aside className="w-72 bg-[#111318] border-r border-white/5 p-5 z-20 flex flex-col shrink-0 gap-4 overflow-y-auto custom-scrollbar">
@@ -279,8 +293,10 @@ export default function DensityPage({ onNavigate }: DensityPageProps) {
 
         <div className="mt-auto pt-3 border-t border-white/5">
           <p className="text-[8px] text-slate-600 uppercase mb-2">Yoğunluk Skalası</p>
-          <div className="h-2 rounded-full overflow-hidden mb-1"
-            style={{ background: 'linear-gradient(to right, #3b82f6, #fde047, #f97316, #ef4444)' }} />
+          <div
+            className="h-2 rounded-full overflow-hidden mb-1"
+            style={{ background: 'linear-gradient(to right, #3b82f6, #fde047, #f97316, #ef4444)' }}
+          />
           <div className="flex justify-between">
             <span className="text-[7px] text-slate-600">Düşük</span>
             <span className="text-[7px] text-slate-600">Yüksek</span>
@@ -294,8 +310,8 @@ export default function DensityPage({ onNavigate }: DensityPageProps) {
       </main>
 
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width:3px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background:#2d313d; border-radius:10px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #2d313d; border-radius: 10px; }
       `}</style>
     </div>
   )

@@ -25,13 +25,6 @@ const (
 //
 // Tüm süreler gerçek zamanlı saniye cinsindendir.
 // simSpeedFactor bu değerleri orantılı olarak hızlandırır.
-//
-// Süreleri değiştirmek için yalnızca DefaultFixedConfig veya
-// DefaultSemiSmartConfig'i güncelleyin — başka bir şeye dokunmanıza gerek yok.
-//
-// Belirli bir kavşağa özel süre vermek için intersections listesinde
-// o kavşağın Config alanını doldurun:
-//
 //	Config: &PhaseConfig{GreenMin: 30, GreenMax: 30, YellowSecs: 4}
 
 type PhaseConfig struct {
