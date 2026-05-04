@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"api-service/internal/dto"
@@ -23,20 +24,64 @@ type Client struct {
 	send chan []byte
 }
 
+// ─── Kanal Sayacı ─────────────────────────────────────────────────────────────
+
+type channelCounter struct {
+	trafficLights  atomic.Int64
+	density        atomic.Int64
+	speedViolation atomic.Int64
+}
+
+func (c *channelCounter) inc(topic string) {
+	switch topic {
+	case "city.traffic_lights":
+		c.trafficLights.Add(1)
+	case "city.density":
+		c.density.Add(1)
+	case "city.speed_violations":
+		c.speedViolation.Add(1)
+	}
+}
+
+// swapAll sıfırlayarak son 1 saniyelik değerleri döner
+func (c *channelCounter) swapAll() (tl, d, sv int64) {
+	return c.trafficLights.Swap(0),
+		c.density.Swap(0),
+		c.speedViolation.Swap(0)
+}
+
+// ─── Hub ──────────────────────────────────────────────────────────────────────
+
 type Hub struct {
 	clients    map[*Client]bool
 	broadcast  chan []byte
 	register   chan *Client
 	unregister chan *Client
 	mu         sync.Mutex
+
+	counter channelCounter // broadcast öncesi sayılır
 }
 
 func NewHub() *Hub {
 	return &Hub{
 		clients:    make(map[*Client]bool),
-		broadcast:  make(chan []byte, 256),
+		broadcast:  make(chan []byte, 2000), // traffic_lights burst'üne karşı büyütüldü
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+	}
+}
+
+// StartThroughputLogger her saniye kanal bazlı throughput'u loglar.
+// main.go'da hub.Run()'dan önce go hub.StartThroughputLogger() ile başlatın.
+func (h *Hub) StartThroughputLogger() {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		tl, d, sv := h.counter.swapAll()
+		log.Printf(
+			"[ws-throughput] traffic_lights: %d/s | density: %d/s | speed_violations: %d/s | toplam: %d/s",
+			tl, d, sv, tl+d+sv,
+		)
 	}
 }
 
@@ -82,7 +127,6 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	client := &Client{conn: conn, send: make(chan []byte, 256)}
 	h.register <- client
 
-	// Yazma goroutine
 	go func() {
 		defer func() {
 			h.unregister <- client
@@ -96,7 +140,6 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// Okuma goroutine (ping/pong için)
 	go func() {
 		defer func() {
 			h.unregister <- client
@@ -116,7 +159,6 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
-// KafkaConsumer — Kafka'dan okuyup hub'a broadcast eder
 func (h *Hub) StartKafkaConsumer(broker string) {
 	topics := []string{"city.traffic_lights", "city.density", "city.speed_violations"}
 
@@ -125,8 +167,8 @@ func (h *Hub) StartKafkaConsumer(broker string) {
 			r := kafka.NewReader(kafka.ReaderConfig{
 				Brokers: []string{broker},
 				Topic:   t,
-				GroupID: "api-service-ws",
-				MaxWait: 500 * time.Millisecond,
+				GroupID: "api-ws-" + t,
+				MaxWait: 50 * time.Millisecond,
 			})
 			defer r.Close()
 
@@ -145,6 +187,10 @@ func (h *Hub) StartKafkaConsumer(broker string) {
 					Data:    json.RawMessage(msg.Value),
 				}
 				bytes, _ := json.Marshal(live)
+
+				// Sayacı broadcast'e girmeden önce artır —
+				// broadcast kanalı doluysa drop'u da görmüş oluruz
+				h.counter.inc(t)
 				h.broadcast <- bytes
 			}
 		}(topic)

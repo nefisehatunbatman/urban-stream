@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -22,25 +23,19 @@ const (
 )
 
 // ─── Faz Konfigürasyonu ────────────────────────────────────────────────────────
-//
-// Tüm süreler gerçek zamanlı saniye cinsindendir.
-// simSpeedFactor bu değerleri orantılı olarak hızlandırır.
-//	Config: &PhaseConfig{GreenMin: 30, GreenMax: 30, YellowSecs: 4}
 
 type PhaseConfig struct {
-	GreenMin   int // yeşil faz minimum süresi (saniye)
-	GreenMax   int // yeşil faz maksimum süresi (saniye)
-	YellowSecs int // sarı faz süresi (saniye)
+	GreenMin   int
+	GreenMax   int
+	YellowSecs int
 }
 
-// DefaultFixedConfig: sabit zamanlı kavşaklar
 var DefaultFixedConfig = PhaseConfig{
 	GreenMin:   18,
 	GreenMax:   22,
 	YellowSecs: 5,
 }
 
-// DefaultSemiSmartConfig: akıllı kavşaklar — yoğunluğa göre GreenMin..GreenMax arası dinamik
 var DefaultSemiSmartConfig = PhaseConfig{
 	GreenMin:   10,
 	GreenMax:   49,
@@ -49,20 +44,14 @@ var DefaultSemiSmartConfig = PhaseConfig{
 
 // ─── Simülasyon Hızı ──────────────────────────────────────────────────────────
 //
-// simSpeedFactor: gerçek süreleri kaç kat hızlandırır.
-//
-// Matematik:
-//   Ortalama döngü ≈ 2×green + 2×yellow ≈ 2×20s + 2×5s = 50s gerçek
-//   Her döngüde 8 emit (4 yön × 2 faz)
-//   Hedef: 10 kavşak × 8 emit/döngü × (döngü/s) = 300 msg/s
-//   → Her kavşak 300/10 = 30 emit/s üretmeli
-//   → Döngü süresi ≤ 8/30 ≈ 267ms simülasyon zamanı
-//   → simSpeedFactor = 50000ms / 267ms ≈ 187 → güvenli taraf için 35 yeterli
-//     (sarı fazlar da dahil, ortalama döngü kısalıyor)
-//
-// 35 ile test edildi: ~300-320 msg/s stabil.
+// Hesap: Fixed kavşak ortalama green=20s, yellow=5s, döngüde 2 faz var.
+// Bir döngü = 2×green + 2×yellow = 50s gerçek zaman.
+// Döngüde 8 emit var (4 yön × 2 faz).
+// Hedef: 10 kavşak × 8 emit / döngü_ms = 300/s ortalama
+// simSpeedFactor=80: döngü ~534ms → 10×8/534ms ≈ 150/s taban
+// Spike'ları yaymak için startDelay 300ms'ye çıkarıldı (toplam 3s spread)
 
-const simSpeedFactor = 35
+const simSpeedFactor = 110
 
 // ─── Kavşak Tanımları ──────────────────────────────────────────────────────────
 
@@ -71,7 +60,7 @@ type Intersection struct {
 	Name     string
 	Type     IntersectionType
 	Location domain.Location
-	Config   *PhaseConfig // nil → tip bazlı default kullanılır
+	Config   *PhaseConfig
 }
 
 const (
@@ -104,13 +93,26 @@ func resolveConfig(inter Intersection) PhaseConfig {
 
 // ─── Event Kuyruğu ────────────────────────────────────────────────────────────
 
-var eventQueue = make(chan domain.TrafficLight, 2000)
+var eventQueue = make(chan domain.TrafficLight, 5000)
+
+var droppedCount atomic.Int64
 
 func init() {
 	for i, inter := range intersections {
-		startDelay := time.Duration(i*100) * time.Millisecond
+		startDelay := time.Duration(i*300) * time.Millisecond
 		go runIntersection(inter, startDelay)
 	}
+
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			dropped := droppedCount.Swap(0)
+			if dropped > 0 {
+				fmt.Printf("[traffic-lights] Son 10s içinde %d event drop edildi\n", dropped)
+			}
+		}
+	}()
 }
 
 func runIntersection(inter Intersection, startDelay time.Duration) {
@@ -124,7 +126,6 @@ func runIntersection(inter Intersection, startDelay time.Duration) {
 	}
 
 	for {
-		// Faz 1: NS Yeşil
 		greenMs := calcGreenMs(cfg, inter.Type, rnd)
 		emit(inter, "N", "green", rnd)
 		emit(inter, "S", "green", rnd)
@@ -132,12 +133,10 @@ func runIntersection(inter Intersection, startDelay time.Duration) {
 		emit(inter, "W", "red", rnd)
 		time.Sleep(time.Duration(greenMs) * time.Millisecond)
 
-		// Faz 2: NS Sarı
 		emit(inter, "N", "yellow", rnd)
 		emit(inter, "S", "yellow", rnd)
 		time.Sleep(time.Duration(yellowMs) * time.Millisecond)
 
-		// Faz 3: EW Yeşil
 		greenMs = calcGreenMs(cfg, inter.Type, rnd)
 		emit(inter, "E", "green", rnd)
 		emit(inter, "W", "green", rnd)
@@ -145,17 +144,12 @@ func runIntersection(inter Intersection, startDelay time.Duration) {
 		emit(inter, "S", "red", rnd)
 		time.Sleep(time.Duration(greenMs) * time.Millisecond)
 
-		// Faz 4: EW Sarı
 		emit(inter, "E", "yellow", rnd)
 		emit(inter, "W", "yellow", rnd)
 		time.Sleep(time.Duration(yellowMs) * time.Millisecond)
 	}
 }
 
-// calcGreenMs: config + kavşak tipine göre hızlandırılmış ms cinsinden yeşil süresi.
-//
-// Fixed     → GreenMin..GreenMax arası küçük mekanik varyasyon
-// SemiSmart → simüle yoğunluk skoru ile GreenMin..GreenMax arasında 4 kademeli dinamik süre
 func calcGreenMs(cfg PhaseConfig, t IntersectionType, rnd *rand.Rand) int {
 	spread := cfg.GreenMax - cfg.GreenMin
 	if spread < 0 {
@@ -207,10 +201,10 @@ func emit(inter Intersection, dir string, status string, rnd *rand.Rand) {
 	select {
 	case eventQueue <- event:
 	default:
+		droppedCount.Add(1)
 	}
 }
 
-// NextTrafficLightEvent: bloklamalı — olay yoksa bekler
 func NextTrafficLightEvent() domain.TrafficLight {
 	return <-eventQueue
 }
@@ -246,22 +240,30 @@ func initZonePool() {
 	zonePool = zones
 }
 
+var densityRnd = newRnd()
+var densityRndMu sync.Mutex
+
 func GenerateDensity() domain.Density {
 	zonePoolOnce.Do(initZonePool)
-	rnd := newRnd()
-	zone := zonePool[rnd.Intn(len(zonePool))]
 
+	densityRndMu.Lock()
+	rnd := densityRnd
+	zone := zonePool[rnd.Intn(len(zonePool))]
 	vehicleCount := rnd.Intn(250)
+	avgSpeedBase := 60.0 - float64(vehicleCount)*0.15
+	avgSpeedJitter := (rnd.Float64() - 0.5) * 10
+	cars := int(float64(vehicleCount) * (0.75 + (rnd.Float64()-0.5)*0.1))
+	buses := int(float64(vehicleCount) * (0.08 + rnd.Float64()*0.05))
+	densityRndMu.Unlock()
+
 	avgSpeed := 0.0
 	if vehicleCount > 0 {
-		base := 60.0 - float64(vehicleCount)*0.15
+		base := avgSpeedBase
 		if base < 5 {
 			base = 5
 		}
-		avgSpeed = base + (rnd.Float64()-0.5)*10
+		avgSpeed = base + avgSpeedJitter
 	}
-	cars := int(float64(vehicleCount) * (0.75 + (rnd.Float64()-0.5)*0.1))
-	buses := int(float64(vehicleCount) * (0.08 + rnd.Float64()*0.05))
 	bikes := vehicleCount - cars - buses
 	if bikes < 0 {
 		bikes = 0
@@ -270,7 +272,7 @@ func GenerateDensity() domain.Density {
 	return domain.Density{
 		ZoneID:          zone.id,
 		VehicleCount:    vehicleCount,
-		PedestrianCount: rnd.Intn(80),
+		PedestrianCount: func() int { densityRndMu.Lock(); v := densityRnd.Intn(80); densityRndMu.Unlock(); return v }(),
 		AvgSpeed:        avgSpeed,
 		VehicleTypes:    domain.VehicleTypes{Car: cars, Bus: buses, Bike: bikes},
 		Location:        domain.Location{Lat: zone.lat, Lng: zone.lng},
@@ -303,21 +305,32 @@ func initRadarPool() {
 	radarPool = radars
 }
 
+var violationRnd = newRnd()
+var violationRndMu sync.Mutex
+
 func GenerateSpeedViolation() domain.SpeedViolation {
 	radarPoolOnce.Do(initRadarPool)
-	rnd := newRnd()
+
+	violationRndMu.Lock()
+	rnd := violationRnd
 	limit := speedZones[rnd.Intn(len(speedZones))]
 	excess := rnd.Intn(30) + 1
 	if rnd.Float64() < 0.2 {
 		excess = 30 + rnd.Intn(40)
 	}
 	radar := radarPool[rnd.Intn(len(radarPool))]
+	plate := plateLetters[rnd.Intn(len(plateLetters))]
+	plateNum := rnd.Intn(999)
+	dir := allDirections[rnd.Intn(len(allDirections))]
+	laneID := rnd.Intn(3) + 1
+	violationRndMu.Unlock()
+
 	return domain.SpeedViolation{
-		VehicleID: fmt.Sprintf("42-%s-%03d", plateLetters[rnd.Intn(len(plateLetters))], rnd.Intn(999)),
+		VehicleID: fmt.Sprintf("42-%s-%03d", plate, plateNum),
 		Speed:     limit + excess,
 		Limit:     limit,
-		LaneID:    rnd.Intn(3) + 1,
-		Direction: allDirections[rnd.Intn(len(allDirections))],
+		LaneID:    laneID,
+		Direction: dir,
 		Location:  radar,
 	}
 }

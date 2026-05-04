@@ -30,6 +30,7 @@ func main() {
 	hub := commands.NewHub()
 	go hub.Run()
 	go hub.StartKafkaConsumer(cfg.KafkaBroker)
+	go hub.StartThroughputLogger() // ← kanal bazlı saniye sayacı
 
 	// 5. Queries & Handler
 	apiQueries := queries.NewAPIQueries(db)

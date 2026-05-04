@@ -9,9 +9,9 @@ interface NavBarProps {
 }
 
 const PAGES: { id: Page; icon: string; label: string; color: string; dot: string }[] = [
-  { id: 'traffic-lights', icon: '🚦', label: 'Trafik Işıkları',  color: '#6366f1', dot: 'bg-indigo-500' },
-  { id: 'density',        icon: '🌡',  label: 'Araç Yoğunluğu', color: '#f97316', dot: 'bg-orange-500' },
-  { id: 'violations',     icon: '⚡',  label: 'Hız İhlalleri',  color: '#ef4444', dot: 'bg-red-500'    },
+  { id: 'traffic-lights', icon: '', label: 'Trafik Işıkları',  color: '#6366f1', dot: 'bg-indigo-500' },
+  { id: 'density',        icon: '',  label: 'Araç Yoğunluğu', color: '#f97316', dot: 'bg-orange-500' },
+  { id: 'violations',     icon: '',  label: 'Hız İhlalleri',  color: '#ef4444', dot: 'bg-red-500'    },
 ]
 
 export const NavBar = memo(({ currentPage, onNavigate }: NavBarProps) => (

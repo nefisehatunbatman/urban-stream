@@ -24,19 +24,17 @@ func NewKafkaProducer(broker string) *KafkaProducer {
 				Balancer:               &kafka.LeastBytes{},
 				AllowAutoTopicCreation: true,
 
-				// ── Yüksek throughput ayarları ────────────────────────────
-				// Async: ACK beklemeden devam et — en kritik ayar
+				// Async: ACK beklemeden devam et
 				Async: true,
 
-				// Batch: 300 msg/s × 3 kanal = 900 msg/s toplam
-				// 5ms'de bir veya 300 mesaj dolunca flush
-				BatchSize:    300,
+				// FIX: 900 msg/s → her 5ms'de ~4-5 mesaj gelir.
+				// BatchSize=300 hiç dolmuyordu, flush tamamen BatchTimeout'a kalıyordu.
+				// Gerçekçi değer: 5ms × 5 msg = ~25, güvenli taraf için 20 yaptık.
+				BatchSize:    20,
 				BatchTimeout: 5 * time.Millisecond,
 
-				// Write timeout: tek mesaj için değil batch için
 				WriteTimeout: 10 * time.Second,
 
-				// Hata logla ama panic yapma
 				ErrorLogger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
 					log.Printf("[kafka-error] "+msg, args...)
 				}),
@@ -53,8 +51,6 @@ func NewKafkaProducer(broker string) *KafkaProducer {
 	return nil
 }
 
-// SendMessage: non-blocking, Kafka writer internal queue'ya ekler.
-// Batch dolunca veya BatchTimeout geçince otomatik flush olur.
 func (kp *KafkaProducer) SendMessage(topic string, message string) {
 	if kp.writer == nil {
 		return
@@ -67,13 +63,10 @@ func (kp *KafkaProducer) SendMessage(topic string, message string) {
 		},
 	)
 	if err != nil {
-		// Async modda bu nadiren tetiklenir (sadece writer kapandıysa)
 		log.Printf("Kafka gönderim hatası [%s]: %v", topic, err)
 	}
-	// log.Printf kaldırıldı — 900 msg/s'de log I/O ciddi bottleneck
 }
 
-// Close: uygulama kapanırken bekleyen batch'leri flush et
 func (kp *KafkaProducer) Close() {
 	if kp.writer != nil {
 		kp.writer.Close()

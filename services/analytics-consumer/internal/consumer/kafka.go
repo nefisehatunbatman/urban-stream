@@ -17,7 +17,6 @@ func StartKafkaConsumer(broker string, topic string, conn clickhouse.Conn) {
 		kConn, err := kafka.Dial("tcp", broker)
 		if err == nil {
 			kConn.Close()
-
 			log.Printf("Kafka bağlantısı başarılı: %s", topic)
 
 			reader = kafka.NewReader(kafka.ReaderConfig{
@@ -26,8 +25,9 @@ func StartKafkaConsumer(broker string, topic string, conn clickhouse.Conn) {
 				GroupID:  "analytics-" + topic,
 				MinBytes: 1,
 				MaxBytes: 10e6,
+				// FIX: MaxWait eklendi — default 10s çok uzun, 500ms yeterli
+				MaxWait: 500 * time.Millisecond,
 			})
-
 			break
 		}
 
@@ -41,7 +41,6 @@ func StartKafkaConsumer(broker string, topic string, conn clickhouse.Conn) {
 	}
 
 	defer reader.Close()
-
 	log.Printf("Kafka consumer başladı: %s", topic)
 
 	for {
@@ -52,8 +51,10 @@ func StartKafkaConsumer(broker string, topic string, conn clickhouse.Conn) {
 			continue
 		}
 
+		// FIX: log.Printf her mesajda kaldırıldı — 300 msg/s × 3 topic = 900 log/s bottleneck
+		// Hata durumlarında handler'lar içinde loglama hâlâ var.
+
 		message := string(msg.Value)
-		log.Printf("Veri alındı [%s]: %s", topic, message)
 
 		switch topic {
 		case "city.traffic_lights":
