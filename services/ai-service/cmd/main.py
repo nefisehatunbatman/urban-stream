@@ -32,6 +32,7 @@ def main():
     # 2. Geçmiş veri yoksa seed et
     seed_historical_data(days=Config.HISTORY_DAYS)
 
+
     # 3. Scheduler'ı başlat
     start_scheduler()
 
