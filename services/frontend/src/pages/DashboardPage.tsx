@@ -8,6 +8,54 @@ import {
   getDensity, getTrafficLights, getSpeedViolations, getPredictions
 } from '../api/endpoints'
 
+// ClickHouse "2026-05-07 08:00:00" veya "2026-05-07T08:00:00" gönderir
+// Tarayıcı T'li string'i LOCAL time olarak parse eder → UTC+3'te 00:00 → 03:00 görünür
+// Bu yüzden Date objesine çevirmeden string'i parse ediyoruz
+
+const parseDs = (v: string) => {
+  // "2026-05-07 03:00:00" veya "2026-05-07T03:00:00" → { month, day, hour, minute }
+  const s = v.replace('T', ' ')
+  const [datePart, timePart = '00:00:00'] = s.split(' ')
+  const [year, month, day] = datePart.split('-').map(Number)
+  const [hour, minute] = timePart.split(':').map(Number)
+  return { year, month, day, hour, minute }
+}
+
+// X ekseni — 00:00'da "05-07 00:00", diğerlerinde "06:00" / "12:00" / "18:00"
+const formatHourlyTick = (v: string) => {
+  const { month, day, hour } = parseDs(v)
+  const hh = String(hour).padStart(2, '0')
+  if (hour === 0) {
+    return `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  }
+  return `${hh}:00`
+}
+
+// Tooltip — "07/05 03:00"
+const formatHourlyTooltip = (v: string) => {
+  const { month, day, hour, minute } = parseDs(v)
+  return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+// filterTo3Hour için saat bilgisi
+const getDsHour = (v: string) => parseDs(v).hour
+
+/**
+ * Tahmin verisini 3 saatlik periyotlara filtreler:
+ * Her gün için yalnızca 00:00, 03:00, 06:00, 09:00, 12:00, 15:00, 18:00, 21:00 noktaları kalır.
+ * Duplicate ds değerlerini de temizler.
+ */
+const filterTo3Hour = (data: any[]): any[] => {
+  const seen = new Set<string>()
+  return data.filter((d: any) => {
+    const hour = getDsHour(d.ds)
+    if (hour % 3 !== 0) return false
+    if (seen.has(d.ds)) return false
+    seen.add(d.ds)
+    return true
+  })
+}
+
 export default function DashboardPage() {
   const [density, setDensity] = useState<any[]>([])
   const [traffic, setTraffic] = useState<any[]>([])
@@ -28,7 +76,8 @@ export default function DashboardPage() {
         setDensity(d.data.data?.slice().reverse() || [])
         setTraffic(t.data.data?.slice().reverse() || [])
         setViolations(v.data.data?.slice().reverse() || [])
-        setPredictions(p.data.data || [])
+        // ← Burada filtrele: backend 3h yazsa da yazmasa da garantili
+        setPredictions(filterTo3Hour(p.data.data || []))
       } catch (e) {
         console.error(e)
       } finally {
@@ -57,6 +106,12 @@ export default function DashboardPage() {
     )
   }
 
+  // Grafiğe sadece 00:00 / 06:00 / 12:00 / 18:00 noktalarını ver
+  // ticks prop yerine veriyi filtrele → Recharts atlama yapmaz
+  const filteredPredictions = predictions.filter(
+    (d: any) => [0, 6, 12, 18].includes(getDsHour(d.ds))
+  )
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -65,8 +120,8 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard title="Ort. Araç Yoğunluğu" value={avgVehicles} subtitle="Son 30 gün"  />
-        <StatCard title="Arıza Oranı" value={`%${avgMalfunction}`} subtitle="Trafik lambaları"  color="text-yellow-400" />
+        <StatCard title="Ort. Araç Yoğunluğu" value={avgVehicles} subtitle="Son 30 gün" />
+        <StatCard title="Arıza Oranı" value={`%${avgMalfunction}`} subtitle="Trafik lambaları" color="text-yellow-400" />
         <StatCard title="Toplam İhlal" value={totalViolations.toLocaleString()} subtitle="Hız ihlalleri" color="text-red-400" />
         <StatCard title="En Yüksek Hız" value={`${maxSpeed} km/h`} subtitle="Kaydedilen max" color="text-orange-400" />
       </div>
@@ -119,7 +174,7 @@ export default function DashboardPage() {
         {activeTab === 'violations' && (
           <>
             <h3 className="text-white font-medium mb-4">Günlük Hız İhlalleri</h3>
-            <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={300}>
               <BarChart data={violations}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2f3347" />
                 <XAxis dataKey="ds" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
@@ -135,13 +190,27 @@ export default function DashboardPage() {
       {predictions.length > 0 && (
         <div className="bg-dark-800 rounded-xl p-5 border border-dark-600">
           <h3 className="text-white font-medium mb-1">AI Tahminleri — Araç Yoğunluğu</h3>
-          <p className="text-slate-500 text-xs mb-4">Prophet modeli ile üretilen 14 günlük projeksiyon</p>
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={predictions}>
+          <p className="text-slate-500 text-xs mb-4">
+            Prophet modeli ile üretilen 14 günlük projeksiyon — 3 saatlik periyotlar
+            (00:00 · 03:00 · 06:00 · 09:00 · 12:00 · 15:00 · 18:00 · 21:00)
+          </p>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={filteredPredictions}>
               <CartesianGrid strokeDasharray="3 3" stroke="#2f3347" />
-              <XAxis dataKey="ds" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => v.slice(5)} />
+              <XAxis
+                dataKey="ds"
+                tick={{ fill: '#94a3b8', fontSize: 10 }}
+                tickFormatter={formatHourlyTick}
+                interval={0}
+                angle={-35}
+                textAnchor="end"
+                height={45}
+              />
               <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: '#1a1d27', border: '1px solid #2f3347', borderRadius: 8 }} />
+              <Tooltip
+                contentStyle={{ background: '#1a1d27', border: '1px solid #2f3347', borderRadius: 8 }}
+                labelFormatter={formatHourlyTooltip}
+              />
               <Legend />
               <Line type="monotone" dataKey="yhat" stroke="#6366f1" name="Tahmin" dot={false} strokeWidth={2} />
               <Line type="monotone" dataKey="yhat_upper" stroke="#6366f188" name="Üst Sınır" dot={false} strokeDasharray="4 4" />

@@ -10,8 +10,6 @@ import (
 func RunMigrations(conn clickhouse.Conn) {
 
 	queries := []string{
-		// FIX 1: timing_remains kaldırıldı (models.go'da yok, JSON'dan gelmez)
-		// FIX 2: changed_at eklendi (models.go'da ChangedAt time.Time var)
 		`CREATE TABLE IF NOT EXISTS traffic_lights (
 			lamp_id           String,
 			status            String,
@@ -22,7 +20,8 @@ func RunMigrations(conn clickhouse.Conn) {
 			changed_at        DateTime,
 			created_at        DateTime DEFAULT now()
 		) ENGINE = MergeTree()
-		ORDER BY (created_at, lamp_id)`,
+		ORDER BY (created_at, lamp_id)
+		TTL created_at + INTERVAL 14 DAY`,
 
 		`CREATE TABLE IF NOT EXISTS density (
 			zone_id           String,
@@ -37,7 +36,8 @@ func RunMigrations(conn clickhouse.Conn) {
 			timestamp         DateTime,
 			created_at        DateTime DEFAULT now()
 		) ENGINE = MergeTree()
-		ORDER BY (created_at, zone_id)`,
+		ORDER BY (created_at, zone_id)
+		TTL created_at + INTERVAL 7 DAY`,
 
 		`CREATE TABLE IF NOT EXISTS speed_violations (
 			vehicle_id  String,
@@ -49,7 +49,8 @@ func RunMigrations(conn clickhouse.Conn) {
 			lng         Float64,
 			created_at  DateTime DEFAULT now()
 		) ENGINE = MergeTree()
-		ORDER BY (created_at, vehicle_id)`,
+		ORDER BY (created_at, vehicle_id)
+		TTL created_at + INTERVAL 30 DAY`,
 
 		// predictions tablosu — ai-service buraya yazar, api-service buradan okur
 		`CREATE TABLE IF NOT EXISTS predictions (
@@ -61,7 +62,8 @@ func RunMigrations(conn clickhouse.Conn) {
 			metric     String,
 			created_at DateTime DEFAULT now()
 		) ENGINE = ReplacingMergeTree(created_at)
-		ORDER BY (channel, metric, ds)`,
+		ORDER BY (channel, metric, ds)
+		TTL created_at + INTERVAL 90 DAY`,
 
 		// analysis_reports tablosu — ai-service buraya yazar
 		`CREATE TABLE IF NOT EXISTS analysis_reports (
@@ -71,7 +73,8 @@ func RunMigrations(conn clickhouse.Conn) {
 			label      String,
 			created_at DateTime DEFAULT now()
 		) ENGINE = MergeTree()
-		ORDER BY (created_at, channel, metric)`,
+		ORDER BY (created_at, channel, metric)
+		TTL created_at + INTERVAL 90 DAY`,
 	}
 
 	for _, query := range queries {

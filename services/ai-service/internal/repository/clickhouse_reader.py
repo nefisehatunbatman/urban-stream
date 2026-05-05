@@ -14,17 +14,17 @@ def get_client() -> Client:
 
 
 def read_density(days: int = Config.HISTORY_DAYS) -> pd.DataFrame:
-    """Son N günlük density verisini okur"""
+    """Son N günlük saatlik density verisini okur"""
     client = get_client()
 
     rows, columns = client.execute(
         f"""
         SELECT
-            toDate(created_at)  AS ds,
-            avg(vehicle_count)  AS avg_vehicles,
-            avg(avg_speed)      AS avg_speed,
-            avg(pedestrian_count) AS avg_pedestrians,
-            count()             AS total_records
+            toStartOfHour(created_at)   AS ds,
+            avg(vehicle_count)          AS avg_vehicles,
+            avg(avg_speed)              AS avg_speed,
+            avg(pedestrian_count)       AS avg_pedestrians,
+            count()                     AS total_records
         FROM density
         WHERE created_at >= now() - INTERVAL {days} DAY
         GROUP BY ds
@@ -38,16 +38,16 @@ def read_density(days: int = Config.HISTORY_DAYS) -> pd.DataFrame:
 
 
 def read_speed_violations(days: int = Config.HISTORY_DAYS) -> pd.DataFrame:
-    """Son N günlük speed_violations verisini okur"""
+    """Son N günlük saatlik speed_violations verisini okur"""
     client = get_client()
 
     rows, columns = client.execute(
         f"""
         SELECT
-            toDate(created_at)  AS ds,
-            count()             AS violation_count,
-            avg(speed)          AS avg_speed,
-            max(speed)          AS max_speed
+            toStartOfHour(created_at)   AS ds,
+            count()                     AS violation_count,
+            avg(speed)                  AS avg_speed,
+            max(speed)                  AS max_speed
         FROM speed_violations
         WHERE created_at >= now() - INTERVAL {days} DAY
         GROUP BY ds
@@ -61,13 +61,13 @@ def read_speed_violations(days: int = Config.HISTORY_DAYS) -> pd.DataFrame:
 
 
 def read_traffic_lights(days: int = Config.HISTORY_DAYS) -> pd.DataFrame:
-    """Son N günlük traffic_lights verisini okur"""
+    """Son N günlük saatlik traffic_lights verisini okur"""
     client = get_client()
 
     rows, columns = client.execute(
         f"""
         SELECT
-            toDate(created_at)                          AS ds,
+            toStartOfHour(created_at)                   AS ds,
             count()                                     AS total_count,
             countIf(is_malfunctioning = 1)              AS malfunction_count,
             countIf(is_malfunctioning = 1) / count()   AS malfunction_rate
@@ -98,6 +98,35 @@ def read_hourly_density(days: int = Config.HISTORY_DAYS) -> pd.DataFrame:
         GROUP BY day_of_week, hour
         ORDER BY day_of_week, hour
         """,
+        with_column_types=True,
+    )
+
+    col_names = [col[0] for col in columns]
+    return pd.DataFrame(rows, columns=col_names)
+
+
+def read_predictions(channel: str, metric: str) -> pd.DataFrame:
+    """
+    En son tahmin sonuçlarını okur.
+    max(created_at) - 1 dakika toleransıyla en güncel batch'i çeker.
+    Sadece 3'e bölünen saatler döner (00, 03, 06, 09, 12, 15, 18, 21).
+    """
+    client = get_client()
+
+    rows, columns = client.execute(
+        """
+        SELECT ds, yhat, yhat_lower, yhat_upper
+        FROM predictions
+        WHERE channel = %(channel)s AND metric = %(metric)s
+          AND created_at >= (
+              SELECT max(created_at) - INTERVAL 1 MINUTE
+              FROM predictions
+              WHERE channel = %(channel)s AND metric = %(metric)s
+          )
+          AND toHour(ds) % 3 = 0
+        ORDER BY ds
+        """,
+        {"channel": channel, "metric": metric},
         with_column_types=True,
     )
 

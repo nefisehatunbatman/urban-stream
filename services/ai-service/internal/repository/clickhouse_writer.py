@@ -20,12 +20,12 @@ def create_tables():
     """Tahmin ve analiz tablolarını oluşturur"""
     client = get_client()
 
-    # Tahmin sonuçları tablosu
+    # Tahmin sonuçları tablosu — ds artık DateTime (saatlik granülarite)
     client.execute("""
         CREATE TABLE IF NOT EXISTS predictions (
             id          UUID DEFAULT generateUUIDv4(),
             channel     String,
-            ds          Date,
+            ds          DateTime,
             yhat        Float64,
             yhat_lower  Float64,
             yhat_upper  Float64,
@@ -33,6 +33,7 @@ def create_tables():
             created_at  DateTime DEFAULT now()
         ) ENGINE = MergeTree()
         ORDER BY (channel, ds, metric)
+        TTL created_at + INTERVAL 30 DAY
     """)
 
     # Saatlik yoğunluk analizi tablosu
@@ -64,14 +65,11 @@ def create_tables():
 
 
 def write_predictions(df: pd.DataFrame, channel: str, metric: str):
-    """Tahmin sonuçlarını ClickHouse'a yazar"""
+    """
+    Tahmin sonuçlarını ClickHouse'a yazar.
+    Silme yok — TTL otomatik temizler, created_at ile versiyonlanır.
+    """
     client = get_client()
-
-    # Önce bu kanal + metric için eski tahminleri sil
-    client.execute(
-        "ALTER TABLE predictions DELETE WHERE channel = %(channel)s AND metric = %(metric)s",
-        {"channel": channel, "metric": metric},
-    )
 
     rows = []
     for _, row in df.iterrows():
