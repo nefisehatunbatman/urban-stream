@@ -40,6 +40,11 @@ func Setup(h *handler.APIHandler, publicKey *rsa.PublicKey) *chi.Mux {
 		r.Get("/api/speed-violations", h.GetSpeedViolations)
 		r.Get("/api/predictions", h.GetPredictions)
 		r.Get("/api/analysis", h.GetAnalysis)
+
+		// Stream kontrol — view_stats yetkisi yeterli
+		r.Get("/api/stream/status", h.StreamStatus)
+		r.Post("/api/stream/pause", h.PauseStream)
+		r.Post("/api/stream/resume", h.ResumeStream)
 	})
 
 	// WebSocket — view_map yetkisi gerekir

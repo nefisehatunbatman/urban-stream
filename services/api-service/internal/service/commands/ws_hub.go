@@ -43,7 +43,6 @@ func (c *channelCounter) inc(topic string) {
 	}
 }
 
-// swapAll sıfırlayarak son 1 saniyelik değerleri döner
 func (c *channelCounter) swapAll() (tl, d, sv int64) {
 	return c.trafficLights.Swap(0),
 		c.density.Swap(0),
@@ -59,20 +58,64 @@ type Hub struct {
 	unregister chan *Client
 	mu         sync.Mutex
 
-	counter channelCounter // broadcast öncesi sayılır
+	counter channelCounter
+
+	// Kanal bazlı pause — her topic bağımsız durdurulabilir
+	pausedChannels sync.Map // map[string]bool
 }
 
 func NewHub() *Hub {
 	return &Hub{
 		clients:    make(map[*Client]bool),
-		broadcast:  make(chan []byte, 2000), // traffic_lights burst'üne karşı büyütüldü
+		broadcast:  make(chan []byte, 2000),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 	}
 }
 
-// StartThroughputLogger her saniye kanal bazlı throughput'u loglar.
-// main.go'da hub.Run()'dan önce go hub.StartThroughputLogger() ile başlatın.
+func (h *Hub) PauseChannel(channel string) {
+	h.pausedChannels.Store(channel, true)
+	log.Printf("[hub] kanal duraklatıldı: %s", channel)
+}
+
+func (h *Hub) ResumeChannel(channel string) {
+	h.pausedChannels.Store(channel, false)
+	log.Printf("[hub] kanal devam ediyor: %s", channel)
+}
+
+func (h *Hub) IsChannelPaused(channel string) bool {
+	v, ok := h.pausedChannels.Load(channel)
+	if !ok {
+		return false
+	}
+	return v.(bool)
+}
+
+// Pause/Resume/IsPaused — geriye dönük uyumluluk için tüm kanalları etkiler
+func (h *Hub) Pause() {
+	for _, t := range []string{"city.traffic_lights", "city.density", "city.speed_violations"} {
+		h.PauseChannel(t)
+	}
+}
+
+func (h *Hub) Resume() {
+	for _, t := range []string{"city.traffic_lights", "city.density", "city.speed_violations"} {
+		h.ResumeChannel(t)
+	}
+}
+
+func (h *Hub) IsPaused() bool {
+	paused := true
+	for _, t := range []string{"city.traffic_lights", "city.density", "city.speed_violations"} {
+		if !h.IsChannelPaused(t) {
+			paused = false
+		}
+	}
+	return paused
+}
+
+// ─── Logger ───────────────────────────────────────────────────────────────────
+
 func (h *Hub) StartThroughputLogger() {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -84,6 +127,8 @@ func (h *Hub) StartThroughputLogger() {
 		)
 	}
 }
+
+// ─── Run ──────────────────────────────────────────────────────────────────────
 
 func (h *Hub) Run() {
 	for {
@@ -116,6 +161,8 @@ func (h *Hub) Run() {
 		}
 	}
 }
+
+// ─── WebSocket ────────────────────────────────────────────────────────────────
 
 func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -159,6 +206,8 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
+// ─── Kafka Consumer ───────────────────────────────────────────────────────────
+
 func (h *Hub) StartKafkaConsumer(broker string) {
 	topics := []string{"city.traffic_lights", "city.density", "city.speed_violations"}
 
@@ -182,14 +231,17 @@ func (h *Hub) StartKafkaConsumer(broker string) {
 					continue
 				}
 
+				// Kanal bazlı pause kontrolü
+				if h.IsChannelPaused(t) {
+					continue
+				}
+
 				live := dto.LiveMessage{
 					Channel: t,
 					Data:    json.RawMessage(msg.Value),
 				}
 				bytes, _ := json.Marshal(live)
 
-				// Sayacı broadcast'e girmeden önce artır —
-				// broadcast kanalı doluysa drop'u da görmüş oluruz
 				h.counter.inc(t)
 				h.broadcast <- bytes
 			}

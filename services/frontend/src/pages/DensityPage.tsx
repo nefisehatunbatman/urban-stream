@@ -6,6 +6,7 @@ import { MapboxOverlay } from '@deck.gl/mapbox'
 import { HeatmapLayer } from '@deck.gl/aggregation-layers'
 import { useMqtt } from '../hooks/useMqtt'
 import { NavBar } from './NavBar'
+import { pauseStream, resumeStream } from '../api/endpoints'
 
 const KONYA_CENTER: [number, number] = [32.492, 37.871]
 const HEATMAP_UPDATE_MS = 500
@@ -130,8 +131,25 @@ export default function DensityPage({ onNavigate }: DensityPageProps) {
   const pausedRef                         = useRef(false)
   const [totalVehicles, setTotalVehicles] = useState(0)
 
-  const handleToggle = useCallback(() => {
-    setPaused(prev => { pausedRef.current = !prev; return !prev })
+  const handleToggle = useCallback(async () => {
+    try {
+      if (pausedRef.current) {
+        await resumeStream('city.density')
+      } else {
+        await pauseStream('city.density')
+        // Heatmap ve zone listesini temizle
+        densityPointsRef.current.clear()
+        pendingZonesRef.current.clear()
+        if (deckOverlayRef.current) {
+          deckOverlayRef.current.setProps({ layers: [makeHeatmapLayer([])] })
+        }
+        setZoneStats([])
+        setTotalVehicles(0)
+      }
+      setPaused(prev => { pausedRef.current = !prev; return !prev })
+    } catch (e) {
+      console.error('Stream toggle hatası:', e)
+    }
   }, [])
 
   const flushHeatmap = useCallback(() => {

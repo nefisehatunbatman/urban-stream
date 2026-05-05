@@ -30,3 +30,10 @@ export const getPredictions = (channel: string) =>
 
 export const getAnalysis = (channel: string) =>
   api.get(`/analysis?channel=${channel}`)
+
+// --- Stream Kontrol ---
+export const pauseStream  = (channel?: string) =>
+  api.post(`/stream/pause${channel ? `?channel=${channel}` : ''}`)
+export const resumeStream = (channel?: string) =>
+  api.post(`/stream/resume${channel ? `?channel=${channel}` : ''}`)
+export const getStreamStatus = () => api.get('/stream/status')

@@ -4,6 +4,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMqtt } from '../hooks/useMqtt'
 import { NavBar } from './NavBar'
+import { pauseStream, resumeStream } from '../api/endpoints'
 
 const KONYA_CENTER: [number, number] = [32.492, 37.871]
 
@@ -148,13 +149,20 @@ export default function ViolationsPage({ onNavigate }: ViolationsPageProps) {
     src?.setData({ type: 'FeatureCollection', features: [] })
   }, [])
 
-  const handleToggle = useCallback(() => {
-    setPaused(p => {
-      const next = !p
+  const handleToggle = useCallback(async () => {
+    try {
+      const next = !pausedRef.current
+      if (next) {
+        await pauseStream('city.speed_violations')
+        clearMapAndBuffer()
+      } else {
+        await resumeStream('city.speed_violations')
+      }
+      setPaused(next)
       pausedRef.current = next
-      if (next) clearMapAndBuffer()   // durdurulduğunda temizle
-      return next
-    })
+    } catch (e) {
+      console.error('Stream toggle hatası:', e)
+    }
   }, [clearMapAndBuffer])
 
   const flushMap = useCallback(() => {

@@ -4,6 +4,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMqtt } from '../hooks/useMqtt'
 import { NavBar } from './NavBar'
+import { pauseStream, resumeStream } from '../api/endpoints'
 
 const KONYA_CENTER: [number, number] = [32.492, 37.871]
 
@@ -171,6 +172,30 @@ export default function TrafficLightsPage({ onNavigate }: { onNavigate: (page: P
   const [paused, setPaused]         = useState(false)
   const pausedRef = useRef(false)
 
+  const handleToggle = useCallback(async () => {
+    try {
+      if (pausedRef.current) {
+        await resumeStream('city.traffic_lights')
+      } else {
+        await pauseStream('city.traffic_lights')
+        // Haritadaki tüm lambaları kırmızıya sıfırla
+        lampMarkersRef.current.forEach(({ el }) => {
+          updateLampElement(el, { status: 'red', isMalfunctioning: false, source: 'local' })
+        })
+        setLampStates(prev => {
+          const reset: LampStateMap = {}
+          Object.keys(prev).forEach(id => {
+            reset[id] = { status: 'red', isMalfunctioning: false, source: 'local', history: [] }
+          })
+          return reset
+        })
+      }
+      setPaused(prev => { pausedRef.current = !prev; return !prev })
+    } catch (e) {
+      console.error('Stream toggle hatası:', e)
+    }
+  }, [])
+
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
     const map = new maplibregl.Map({
@@ -264,7 +289,7 @@ export default function TrafficLightsPage({ onNavigate }: { onNavigate: (page: P
         </div>
 
         <div>
-          <button onClick={() => { pausedRef.current = !paused; setPaused(!paused) }}
+          <button onClick={handleToggle}
             className={`w-full py-2 rounded-xl border font-bold text-[11px] transition-all ${paused ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
             {paused ? '▶ Başlat' : '⏸ Durdur'}
           </button>

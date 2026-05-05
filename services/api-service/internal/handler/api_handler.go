@@ -88,6 +88,48 @@ func (h *APIHandler) LiveWS(w http.ResponseWriter, r *http.Request) {
 	h.hub.ServeWS(w, r)
 }
 
+// ─── Stream Kontrol ───────────────────────────────────────────────────────────
+
+// PauseStream Kafka'dan broadcast'e veri akışını durdurur.
+// ?channel=city.traffic_lights gibi belirli bir kanal verilebilir.
+// Verilmezse tüm kanallar durur.
+// POST /api/stream/pause
+func (h *APIHandler) PauseStream(w http.ResponseWriter, r *http.Request) {
+	channel := r.URL.Query().Get("channel")
+	if channel != "" {
+		h.hub.PauseChannel(channel)
+		pkg.JSON(w, http.StatusOK, map[string]string{"status": "paused", "channel": channel})
+		return
+	}
+	h.hub.Pause()
+	pkg.JSON(w, http.StatusOK, map[string]string{"status": "paused", "channel": "all"})
+}
+
+// ResumeStream veri akışını devam ettirir.
+// POST /api/stream/resume
+func (h *APIHandler) ResumeStream(w http.ResponseWriter, r *http.Request) {
+	channel := r.URL.Query().Get("channel")
+	if channel != "" {
+		h.hub.ResumeChannel(channel)
+		pkg.JSON(w, http.StatusOK, map[string]string{"status": "running", "channel": channel})
+		return
+	}
+	h.hub.Resume()
+	pkg.JSON(w, http.StatusOK, map[string]string{"status": "running", "channel": "all"})
+}
+
+// StreamStatus akışın mevcut durumunu döner.
+// GET /api/stream/status
+func (h *APIHandler) StreamStatus(w http.ResponseWriter, r *http.Request) {
+	pkg.JSON(w, http.StatusOK, map[string]any{
+		"traffic_lights":   h.hub.IsChannelPaused("city.traffic_lights"),
+		"density":          h.hub.IsChannelPaused("city.density"),
+		"speed_violations": h.hub.IsChannelPaused("city.speed_violations"),
+	})
+}
+
+// ─── Yardımcı ─────────────────────────────────────────────────────────────────
+
 func getDays(r *http.Request, fallback int) int {
 	if v := r.URL.Query().Get("days"); v != "" {
 		if i, err := strconv.Atoi(v); err == nil && i > 0 {
