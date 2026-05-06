@@ -1,39 +1,82 @@
-import { api, authApi } from './axios'
+import axios from 'axios'
 
-// --- Auth ---
+const AUTH_BASE = import.meta.env.VITE_AUTH_URL || 'http://localhost:8081'
+const ANALYTICS_BASE = import.meta.env.VITE_ANALYTICS_URL || 'http://localhost:8082'
+
+const api = axios.create({ baseURL: AUTH_BASE })
+const analyticsApi = axios.create({ baseURL: ANALYTICS_BASE })
+
+// Token interceptor
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+analyticsApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+// Auth
 export const login = (email: string, password: string) =>
-  authApi.post('/login', { email, password })
+  api.post('/auth/login', { email, password })
 
-export const getMe = (token: string) =>
-  authApi.get('/me', { headers: { Authorization: `Bearer ${token}` } })
+export const register = (email: string, password: string, full_name: string) =>
+  api.post('/auth/register', { email, password, full_name })
 
-export const getUsers = () => api.get('/users')
+export const refreshToken = (refresh_token: string) =>
+  api.post('/auth/refresh', { refresh_token })
+
+export const logout = (refresh_token: string) =>
+  api.post('/auth/logout', { refresh_token })
+
+export const getMe = (token?: string) =>
+  api.get('/auth/me', {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
+
+// Users
+export const listUsers = () => api.get('/users')
+export const getUsers = listUsers // alias
 
 export const assignRole = (userId: string, roleId: number) =>
   api.put(`/users/${userId}/role`, { role_id: roleId })
 
-// --- Data ---
+// Roles
+export const listRoles = () => api.get('/roles')
+
+// Analytics (ClickHouse servisi)
 export const getDensity = (days = 30) =>
-  api.get(`/density?days=${days}`)
+  analyticsApi.get(`/api/density?days=${days}`)
 
 export const getHourlyDensity = (days = 30) =>
-  api.get(`/density/hourly?days=${days}`)
+  analyticsApi.get(`/api/density/hourly?days=${days}`)
 
 export const getTrafficLights = (days = 30) =>
-  api.get(`/traffic-lights?days=${days}`)
+  analyticsApi.get(`/api/traffic-lights?days=${days}`)
 
 export const getSpeedViolations = (days = 30) =>
-  api.get(`/speed-violations?days=${days}`)
+  analyticsApi.get(`/api/speed-violations?days=${days}`)
 
-export const getPredictions = (channel: string) =>
-  api.get(`/predictions?channel=${channel}`)
+export const getAirQuality = (days = 30) =>
+  analyticsApi.get(`/api/density?days=${days}`) // air-quality ayrı endpoint yok
 
-export const getAnalysis = (channel: string) =>
-  api.get(`/analysis?channel=${channel}`)
+// AI Projeksiyonlar — channel: 'density' | 'speed_violations' | 'traffic_lights'
+export const getPredictions = (channel = 'density') =>
+  analyticsApi.get(`/api/predictions?channel=${channel}`)
 
-// --- Stream Kontrol ---
-export const pauseStream  = (channel?: string) =>
-  api.post(`/stream/pause${channel ? `?channel=${channel}` : ''}`)
+// Analiz raporları
+export const getAnalysis = (channel = 'density') =>
+  analyticsApi.get(`/api/analysis?channel=${channel}`)
+
+// Stream kontrol — channel query param ile veya tüm kanallar
+export const pauseStream = (channel?: string) =>
+  analyticsApi.post(`/api/stream/pause${channel ? `?channel=${channel}` : ''}`)
+
 export const resumeStream = (channel?: string) =>
-  api.post(`/stream/resume${channel ? `?channel=${channel}` : ''}`)
-export const getStreamStatus = () => api.get('/stream/status')
+  analyticsApi.post(`/api/stream/resume${channel ? `?channel=${channel}` : ''}`)
+
+export const streamStatus = () =>
+  analyticsApi.get('/api/stream/status')

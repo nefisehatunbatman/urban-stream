@@ -15,6 +15,7 @@ interface AuthState {
   setAuth: (token: string, user: User) => void
   logout: () => void
   hasPermission: (permission: string) => boolean
+  hasRole: (role: string) => boolean
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -22,13 +23,32 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       token: null,
       user: null,
-      setAuth: (token, user) => set({ token, user }),
-      logout: () => set({ token: null, user: null }),
+
+      setAuth: (token, user) => {
+        localStorage.setItem('access_token', token)
+        set({ token, user })
+      },
+
+      logout: () => {
+        localStorage.removeItem('access_token')
+        set({ token: null, user: null })
+      },
+
       hasPermission: (permission) => {
         const { user } = get()
-        return user?.permissions?.includes(permission) ?? false
+        if (!user) return false
+        return user.permissions.includes(permission)
+      },
+
+      hasRole: (role) => {
+        const { user } = get()
+        if (!user) return false
+        return user.role === role
       },
     }),
-    { name: 'auth-storage' }
+    {
+      name: 'auth-storage',
+      partialify: (state) => ({ token: state.token, user: state.user }),
+    } as Parameters<typeof persist>[1]
   )
 )

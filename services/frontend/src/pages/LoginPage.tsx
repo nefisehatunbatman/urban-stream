@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { login, getMe } from '../api/endpoints'
 import { useAuthStore } from '../store/authStore'
 
@@ -84,6 +84,13 @@ export default function LoginPage() {
               {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
             </button>
           </form>
+
+          <p className="text-center text-sm text-slate-500 mt-6">
+            Hesabın yok mu?{' '}
+            <Link to="/register" className="text-primary hover:text-indigo-400 transition-colors">
+              Kayıt Ol
+            </Link>
+          </p>
         </div>
       </div>
     </div>

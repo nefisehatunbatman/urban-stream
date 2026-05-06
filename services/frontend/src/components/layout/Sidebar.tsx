@@ -2,10 +2,12 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 
 const navItems = [
-  { path: '/dashboard', label: 'Dashboard',  permission: 'view_stats' },
-  { path: '/live', label: 'Canlı Akış',  permission: 'view_stats' },
-  { path: '/map', label: 'Harita',  permission: 'view_map' },
-  { path: '/users', label: 'Kullanıcılar',  permission: 'manage_users' },
+  { path: '/dashboard', label: 'Dashboard',        icon: '📊', permission: 'view_stats' },
+  { path: '/live',      label: 'Canlı Akış',       icon: '📡', permission: 'view_stats' },
+  { path: '/map',       label: 'Harita',            icon: '🗺️', permission: 'view_map' },
+  { path: '/reports',   label: 'Raporlar',          icon: '📋', permission: 'create_report' },
+  { path: '/users',     label: 'Kullanıcılar',      icon: '👥', permission: 'manage_users' },
+  { path: '/roles',     label: 'Roller & Yetkiler', icon: '🔐', permission: 'assign_roles' },
 ]
 
 export default function Sidebar() {
@@ -41,6 +43,7 @@ export default function Sidebar() {
                 }`
               }
             >
+              <span className="text-base leading-none">{item.icon}</span>
               <span>{item.label}</span>
             </NavLink>
           )
