@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { getDensity, getTrafficLights, getSpeedViolations, getAirQuality } from '../api/endpoints'
+import { getDensity, getTrafficLights, getSpeedViolations } from '../api/endpoints'
 
-type ReportType = 'density' | 'traffic' | 'violations' | 'air_quality'
+type ReportType = 'density' | 'traffic' | 'violations'
 
 const REPORT_CONFIG = {
   density: {
@@ -43,20 +43,6 @@ const REPORT_CONFIG = {
       { key: 'max_speed', label: 'Maks. Hız (km/h)' },
     ],
   },
-  air_quality: {
-    label: 'Hava Kalitesi',
-    code: 'AIR',
-    color: 'text-success',
-    border: 'border-success/40',
-    bg: 'bg-success/10',
-    columns: [
-      { key: 'ds', label: 'Tarih' },
-      { key: 'avg_co2', label: 'Ort. CO2' },
-      { key: 'avg_no2', label: 'Ort. NO2' },
-      { key: 'avg_aqi', label: 'Ort. AQI' },
-      { key: 'avg_temp', label: 'Ort. Sıcaklık (C)' },
-    ],
-  },
 }
 
 const DAY_OPTIONS = [7, 14, 30, 60, 90]
@@ -76,8 +62,7 @@ export default function ReportsPage() {
       let res
       if (activeReport === 'density') res = await getDensity(days)
       else if (activeReport === 'traffic') res = await getTrafficLights(days)
-      else if (activeReport === 'violations') res = await getSpeedViolations(days)
-      else res = await getAirQuality(days)
+      else res = await getSpeedViolations(days)
       setData(res.data.data || [])
     } catch {
       setError('Veriler yüklenemedi. Analytics servisi çalışıyor mu?')

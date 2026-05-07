@@ -130,22 +130,12 @@ export default function DensityLivePage() {
         ))}
       </div>
 
-      {/* Area chart - araç + yaya */}
+      {/* Sütun grafik - araç + yaya */}
       <div className="rounded-2xl border border-white/5 p-5"
         style={{ background: '#090909' }}>
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Araç & Yaya Yoğunluğu</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Araç & Yaya Yoğunluğu (Sütun)</p>
         <ResponsiveContainer width="100%" height={200}>
-          <AreaChart data={series} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
-            <defs>
-              <linearGradient id="gV" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#22c55e" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="gP" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#14b8a6" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
-              </linearGradient>
-            </defs>
+          <BarChart data={series} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
             <XAxis dataKey="t" tick={{ fill: AXIS, fontSize: 9 }} interval={9} />
             <YAxis tick={{ fill: AXIS, fontSize: 9 }} />
@@ -153,9 +143,9 @@ export default function DensityLivePage() {
               contentStyle={{ background: '#0b0b0b', border: '1px solid #1f1f1f', borderRadius: 8, fontSize: 11 }}
               labelStyle={{ color: '#64748b' }}
             />
-            <Area type="monotone" dataKey="vehicles" stroke="#22c55e" fill="url(#gV)" strokeWidth={2} dot={false} name="Araç" isAnimationActive={false} />
-            <Area type="monotone" dataKey="peds"     stroke="#14b8a6" fill="url(#gP)" strokeWidth={1.5} dot={false} name="Yaya" isAnimationActive={false} />
-          </AreaChart>
+            <Bar dataKey="vehicles" name="Araç" fill="#22c55e" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+            <Bar dataKey="peds" name="Yaya" fill="#14b8a6" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+          </BarChart>
         </ResponsiveContainer>
       </div>
 
