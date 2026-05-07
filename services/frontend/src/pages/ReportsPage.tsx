@@ -5,20 +5,20 @@ type ReportType = 'density' | 'traffic' | 'violations' | 'air_quality'
 
 const REPORT_CONFIG = {
   density: {
-    label: 'Arac Yogunlugu',
+    label: 'Araç Yoğunluğu',
     code: 'DEN',
     color: 'text-primary',
     border: 'border-primary/40',
     bg: 'bg-primary/10',
     columns: [
       { key: 'ds', label: 'Tarih' },
-      { key: 'avg_vehicles', label: 'Ort. Arac' },
+      { key: 'avg_vehicles', label: 'Ort. Araç' },
       { key: 'avg_pedestrians', label: 'Ort. Yaya' },
-      { key: 'avg_speed', label: 'Ort. Hiz (km/h)' },
+      { key: 'avg_speed', label: 'Ort. Hız (km/h)' },
     ],
   },
   traffic: {
-    label: 'Trafik Lambasi',
+    label: 'Trafik Lambası',
     code: 'TRF',
     color: 'text-warning',
     border: 'border-warning/40',
@@ -26,21 +26,21 @@ const REPORT_CONFIG = {
     columns: [
       { key: 'ds', label: 'Tarih' },
       { key: 'total_lamps', label: 'Toplam Lamba' },
-      { key: 'malfunction_count', label: 'Ariza Sayisi' },
-      { key: 'malfunction_rate', label: 'Ariza Orani' },
+      { key: 'malfunction_count', label: 'Arıza Sayısı' },
+      { key: 'malfunction_rate', label: 'Arıza Oranı' },
     ],
   },
   violations: {
-    label: 'Hiz Ihlalleri',
+    label: 'Hız İhlalleri',
     code: 'SPD',
     color: 'text-danger',
     border: 'border-danger/40',
     bg: 'bg-danger/10',
     columns: [
       { key: 'ds', label: 'Tarih' },
-      { key: 'violation_count', label: 'Ihlal Sayisi' },
-      { key: 'avg_speed', label: 'Ort. Hiz (km/h)' },
-      { key: 'max_speed', label: 'Max Hiz (km/h)' },
+      { key: 'violation_count', label: 'İhlal Sayısı' },
+      { key: 'avg_speed', label: 'Ort. Hız (km/h)' },
+      { key: 'max_speed', label: 'Maks. Hız (km/h)' },
     ],
   },
   air_quality: {
@@ -54,7 +54,7 @@ const REPORT_CONFIG = {
       { key: 'avg_co2', label: 'Ort. CO2' },
       { key: 'avg_no2', label: 'Ort. NO2' },
       { key: 'avg_aqi', label: 'Ort. AQI' },
-      { key: 'avg_temp', label: 'Ort. Sicaklik (C)' },
+      { key: 'avg_temp', label: 'Ort. Sıcaklık (C)' },
     ],
   },
 }
@@ -80,7 +80,7 @@ export default function ReportsPage() {
       else res = await getAirQuality(days)
       setData(res.data.data || [])
     } catch {
-      setError('Veriler yuklenemedi. Analytics servisi calisiyor mu?')
+      setError('Veriler yüklenemedi. Analytics servisi çalışıyor mu?')
     } finally {
       setLoading(false)
     }
@@ -160,7 +160,7 @@ export default function ReportsPage() {
   const config = REPORT_CONFIG[activeReport]
 
   return (
-    <div className="p-8 bg-dark-900 min-h-screen">
+    <div className="p-8 bg-black min-h-screen">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Raporlar</h1>
@@ -170,16 +170,16 @@ export default function ReportsPage() {
           <button
             onClick={handleExportCSV}
             disabled={data.length === 0}
-            className="bg-dark-700 hover:bg-dark-600 border border-dark-600 text-slate-300 px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-40"
+            className="bg-[#050505] hover:bg-[#0a0a0a] border border-warning/30 text-slate-300 px-4 py-2 rounded-md text-sm font-medium transition-all duration-150 disabled:opacity-40"
           >
-            CSV Indir
+            CSV İndir
           </button>
           <button
             onClick={handleExportPDF}
             disabled={data.length === 0}
-            className="bg-primary/20 hover:bg-primary/30 border border-primary/40 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-40"
+            className="bg-primary/20 hover:bg-primary/30 border border-primary/40 text-white px-4 py-2 rounded-md text-sm font-medium transition-all duration-150 disabled:opacity-40"
           >
-            PDF / Yazdir
+            PDF / Yazdır
           </button>
         </div>
       </div>
@@ -191,10 +191,10 @@ export default function ReportsPage() {
             <button
               key={type}
               onClick={() => setActiveReport(type)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors border ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-150 border ${
                 activeReport === type
                   ? `${c.bg} ${c.border} ${c.color}`
-                  : 'bg-dark-800 border-dark-600 text-slate-400 hover:text-white hover:bg-dark-700'
+                  : 'bg-[#050505] border border-primary/25 text-slate-400 hover:text-white hover:bg-[#0a0a0a]'
               }`}
             >
               <span className="text-[10px] font-bold tracking-wider">{c.code}</span>
@@ -205,41 +205,41 @@ export default function ReportsPage() {
       </div>
 
       <div className="flex items-center gap-4 mb-6">
-        <span className="text-sm text-slate-400">Zaman Araligi:</span>
+        <span className="text-sm text-slate-400">Zaman Aralığı:</span>
         <div className="flex gap-2">
           {DAY_OPTIONS.map((d) => (
             <button
               key={d}
               onClick={() => setDays(d)}
-              className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
+              className={`px-3 py-1.5 rounded-md text-sm border transition-all duration-150 ${
                 days === d
                   ? 'bg-primary/10 border-primary/40 text-white'
-                  : 'bg-dark-800 border-dark-600 text-slate-400 hover:text-white hover:bg-dark-700'
+                  : 'bg-[#050505] border border-primary/25 text-slate-400 hover:text-white hover:bg-[#0a0a0a]'
               }`}
             >
-              {d} gun
+              {d} gün
             </button>
           ))}
         </div>
         <span className="text-xs text-slate-500 ml-auto">
-          {data.length} kayit
+          {data.length} kayıt
         </span>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="text-slate-400 animate-pulse">Yukleniyor...</div>
+          <div className="text-slate-400 animate-pulse">Yükleniyor...</div>
         </div>
       ) : error ? (
         <div className="bg-danger/10 border border-danger/30 rounded-md px-4 py-4 text-danger text-sm">
           {error}
         </div>
       ) : (
-        <div ref={tableRef} className="bg-dark-800 rounded-md border border-dark-600 overflow-hidden shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
+        <div ref={tableRef} className="bg-[#050505] rounded-md border border-primary/30 overflow-hidden shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-dark-600 bg-dark-700/60">
+                <tr className="border-b border-primary/20 bg-[#0a0a0a]">
                   {config.columns.map((col) => (
                     <th
                       key={col.key}
@@ -250,19 +250,19 @@ export default function ReportsPage() {
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-dark-600">
+              <tbody className="divide-y divide-primary/20">
                 {data.length === 0 ? (
                   <tr>
                     <td
                       colSpan={config.columns.length}
                       className="text-center text-slate-500 py-16"
                     >
-                      Veri bulunamadi
+                      Veri bulunamadı
                     </td>
                   </tr>
                 ) : (
                   data.map((row, i) => (
-                    <tr key={i} className="hover:bg-dark-700/45 transition-colors">
+                    <tr key={i} className="hover:bg-[#0a0a0a] transition-colors">
                       {config.columns.map((col) => {
                         const val = row[col.key]
                         return (

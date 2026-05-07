@@ -99,7 +99,7 @@ const ZoneCard = memo(({ z, color, label }: { z: ZoneStat; color: string; label:
 ))
 
 function getDensityLevel(count: number) {
-  if (count < 30)  return { label: 'Düşük',  color: '#3b82f6' }
+  if (count < 30)  return { label: 'Düşük',  color: '#22c55e' }
   if (count < 80)  return { label: 'Orta',   color: '#fde047' }
   if (count < 150) return { label: 'Yüksek', color: '#f97316' }
   return                  { label: 'Kritik', color: '#ef4444' }
@@ -251,10 +251,10 @@ export default function DensityPage({ onNavigate }: DensityPageProps) {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-screen bg-[#0a0b0e] overflow-hidden select-none text-white">
-      <aside className="w-72 bg-[#111318] border-r border-white/5 p-5 z-20 flex flex-col shrink-0 gap-4 overflow-y-auto custom-scrollbar">
+    <div className="flex h-screen bg-[#000000] overflow-hidden select-none text-white">
+      <aside className="w-72 bg-[#080808] border-r border-white/5 p-5 z-20 flex flex-col shrink-0 gap-4 overflow-y-auto custom-scrollbar">
         <div>
-          <h1 className="text-xl font-black text-primary italic tracking-tighter">TWINUP CITY</h1>
+          <h1 className="text-xl font-black text-primary italic tracking-tighter"></h1>
           <p className="text-[9px] text-slate-600 uppercase tracking-widest mt-0.5">Araç Yoğunluğu · Isı Haritası</p>
         </div>
 
@@ -313,7 +313,7 @@ export default function DensityPage({ onNavigate }: DensityPageProps) {
           <p className="text-[8px] text-slate-600 uppercase mb-2">Yoğunluk Skalası</p>
           <div
             className="h-2 rounded-full overflow-hidden mb-1"
-            style={{ background: 'linear-gradient(to right, #3b82f6, #fde047, #f97316, #ef4444)' }}
+            style={{ background: 'linear-gradient(to right, #22c55e, #fde047, #f97316, #ef4444)' }}
           />
           <div className="flex justify-between">
             <span className="text-[7px] text-slate-600">Düşük</span>

@@ -21,8 +21,8 @@ interface StatusCounts { red: number; yellow: number; green: number }
 interface FaultPoint   { t: string; faults: number; total: number }
 
 const STATUS_COLOR = { red: '#ef4444', yellow: '#f59e0b', green: '#22c55e' }
-const GRID = '#1a1d2e'
-const AXIS = '#3f4460'
+const GRID = '#1c1c1c'
+const AXIS = '#5f6368'
 
 export default function TrafficLivePage() {
   const { connected, setOnMessage } = useMqtt(['city/konya/traffic_lights'])
@@ -107,7 +107,7 @@ export default function TrafficLivePage() {
 
   return (
     <div className="h-full overflow-y-auto px-6 py-5 space-y-5"
-      style={{ background: 'linear-gradient(160deg,#080a0f 0%,#0f0d0a 100%)' }}>
+      style={{ background: 'linear-gradient(160deg,#000000 0%,#050505 100%)' }}>
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -141,7 +141,7 @@ export default function TrafficLivePage() {
 
       <div className="grid grid-cols-2 gap-4">
         {/* Pie chart */}
-        <div className="rounded-2xl border border-white/5 p-5 flex flex-col" style={{ background: '#0d0f1a' }}>
+        <div className="rounded-2xl border border-white/5 p-5 flex flex-col" style={{ background: '#090909' }}>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Durum Dağılımı</p>
           <div className="flex-1 flex items-center justify-center relative">
             <ResponsiveContainer width="100%" height={200}>
@@ -160,7 +160,7 @@ export default function TrafficLivePage() {
                     <Cell key={i} fill={entry.color} opacity={0.9} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ background: '#0f1117', border: '1px solid #1e2235', borderRadius: 8, fontSize: 11 }} />
+                <Tooltip contentStyle={{ background: '#0b0b0b', border: '1px solid #1f1f1f', borderRadius: 8, fontSize: 11 }} />
                 <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ color: '#64748b', fontSize: 10 }}>{v}</span>} />
               </PieChart>
             </ResponsiveContainer>
@@ -175,14 +175,14 @@ export default function TrafficLivePage() {
         </div>
 
         {/* Fault bar chart */}
-        <div className="rounded-2xl border border-white/5 p-5" style={{ background: '#0d0f1a' }}>
+        <div className="rounded-2xl border border-white/5 p-5" style={{ background: '#090909' }}>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Anlık Arıza Sayısı</p>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={faultSeries} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="t" tick={{ fill: AXIS, fontSize: 9 }} interval={7} />
               <YAxis tick={{ fill: AXIS, fontSize: 9 }} />
-              <Tooltip contentStyle={{ background: '#0f1117', border: '1px solid #1e2235', borderRadius: 8, fontSize: 11 }} />
+              <Tooltip contentStyle={{ background: '#0b0b0b', border: '1px solid #1f1f1f', borderRadius: 8, fontSize: 11 }} />
               <Bar dataKey="faults" fill="#f97316" radius={[3, 3, 0, 0]} name="Arıza" isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
@@ -190,7 +190,7 @@ export default function TrafficLivePage() {
       </div>
 
       {/* Event timeline */}
-      <div className="rounded-2xl border border-white/5 p-5" style={{ background: '#0d0f1a' }}>
+      <div className="rounded-2xl border border-white/5 p-5" style={{ background: '#090909' }}>
         <div className="flex items-center justify-between mb-3">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Son Olaylar</p>
           <span className="text-[9px] font-mono text-slate-700">{msgCount.toLocaleString()} toplam</span>

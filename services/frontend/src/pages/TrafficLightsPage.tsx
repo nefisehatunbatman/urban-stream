@@ -89,7 +89,7 @@ function createLampElement(): HTMLDivElement {
   inner.appendChild(badge)
   const srcDot = document.createElement('div')
   srcDot.className = 'source-dot'
-  srcDot.style.cssText = `display:none;position:absolute;bottom:-5px;right:-5px;width:6px;height:6px;border-radius:50%;background:#6366f1;border:1px solid #000;`
+  srcDot.style.cssText = `display:none;position:absolute;bottom:-5px;right:-5px;width:6px;height:6px;border-radius:50%;background:#22c55e;border:1px solid #000;`
   inner.appendChild(srcDot)
   wrapper.appendChild(inner)
   return wrapper
@@ -117,7 +117,7 @@ const LampPopup = memo(({ info, state, onClose }: { info: any; state: LampState 
   const activeEntry = state.history.find(h => h.duration === 'aktif')
   return (
     <div style={{ left: info.x + 14, top: Math.max(10, info.y - 10) }}
-      className="absolute z-50 bg-[#0f1117] border border-white/10 rounded-2xl p-4 w-64 shadow-2xl pointer-events-auto">
+      className="absolute z-50 bg-[#0b0b0b] border border-white/10 rounded-2xl p-4 w-64 shadow-2xl pointer-events-auto">
       <div className="flex justify-between items-start mb-3">
         <div>
           <div className="flex items-center gap-1.5">
@@ -273,10 +273,10 @@ export default function TrafficLightsPage({ onNavigate }: { onNavigate: (page: P
   const faults = ALL_LAMPS.filter(l => lampStates[l.lampId]?.isMalfunctioning)
 
   return (
-    <div className="flex h-screen bg-[#0a0b0e] overflow-hidden select-none text-white">
-      <aside className="w-72 bg-[#111318] border-r border-white/5 p-5 z-20 flex flex-col shrink-0 gap-4 overflow-y-auto custom-scrollbar">
+    <div className="flex h-screen bg-[#000000] overflow-hidden select-none text-white">
+      <aside className="w-72 bg-[#080808] border-r border-white/5 p-5 z-20 flex flex-col shrink-0 gap-4 overflow-y-auto custom-scrollbar">
         <div>
-          <h1 className="text-xl font-black text-warning italic tracking-tighter">TWINUP CITY</h1>
+          <h1 className="text-xl font-black text-warning italic tracking-tighter"></h1>
           <p className="text-[9px] text-slate-600 uppercase tracking-widest mt-0.5">Trafik Işıkları · Canlı İzleme</p>
         </div>
 

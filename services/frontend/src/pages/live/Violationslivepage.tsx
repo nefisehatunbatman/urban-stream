@@ -21,8 +21,8 @@ const BUCKETS: { label: string; min: number; max: number; color: string }[] = [
   { label: '>120',   min: 120, max: Infinity, color: '#dc2626' },
 ]
 
-const GRID = '#1a1d2e'
-const AXIS = '#3f4460'
+const GRID = '#1c1c1c'
+const AXIS = '#5f6368'
 
 export default function ViolationsLivePage() {
   const { connected, setOnMessage } = useMqtt(['city/konya/speed_violations'])
@@ -91,7 +91,7 @@ export default function ViolationsLivePage() {
 
   return (
     <div className="h-full overflow-y-auto px-6 py-5 space-y-5"
-      style={{ background: 'linear-gradient(160deg,#080a0f 0%,#100808 100%)' }}>
+      style={{ background: 'linear-gradient(160deg,#000000 0%,#050505 100%)' }}>
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -124,7 +124,7 @@ export default function ViolationsLivePage() {
       </div>
 
       {/* Speed area chart */}
-      <div className="rounded-2xl border border-white/5 p-5" style={{ background: '#0d0f1a' }}>
+      <div className="rounded-2xl border border-white/5 p-5" style={{ background: '#090909' }}>
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Anlık Hız (max & ortalama)</p>
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart data={series} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
@@ -142,7 +142,7 @@ export default function ViolationsLivePage() {
             <XAxis dataKey="t" tick={{ fill: AXIS, fontSize: 9 }} interval={9} />
             <YAxis tick={{ fill: AXIS, fontSize: 9 }} unit=" km/h" />
             <Tooltip
-              contentStyle={{ background: '#0f1117', border: '1px solid #1e2235', borderRadius: 8, fontSize: 11 }}
+              contentStyle={{ background: '#0b0b0b', border: '1px solid #1f1f1f', borderRadius: 8, fontSize: 11 }}
               labelStyle={{ color: '#64748b' }}
             />
             <Area type="monotone" dataKey="speed" stroke="#ef4444" fill="url(#gMax)" strokeWidth={2} dot={false} name="Max" isAnimationActive={false} />
@@ -152,14 +152,14 @@ export default function ViolationsLivePage() {
       </div>
 
       {/* Histogram */}
-      <div className="rounded-2xl border border-white/5 p-5" style={{ background: '#0d0f1a' }}>
+      <div className="rounded-2xl border border-white/5 p-5" style={{ background: '#090909' }}>
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Hız Dağılımı (km/h)</p>
         <ResponsiveContainer width="100%" height={160}>
           <BarChart data={buckets} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
             <XAxis dataKey="label" tick={{ fill: AXIS, fontSize: 10 }} />
             <YAxis tick={{ fill: AXIS, fontSize: 9 }} />
-            <Tooltip contentStyle={{ background: '#0f1117', border: '1px solid #1e2235', borderRadius: 8, fontSize: 11 }} />
+            <Tooltip contentStyle={{ background: '#0b0b0b', border: '1px solid #1f1f1f', borderRadius: 8, fontSize: 11 }} />
             <Bar dataKey="count" name="İhlal" radius={[4, 4, 0, 0]} isAnimationActive={false}>
               {buckets.map((b, i) => (
                 <Cell key={i} fill={b.color} />

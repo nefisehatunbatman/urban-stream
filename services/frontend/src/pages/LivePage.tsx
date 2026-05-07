@@ -7,7 +7,7 @@ type Tab = 'density' | 'traffic' | 'violations'
 const ALL_TABS: Tab[] = ['density', 'traffic', 'violations']
 
 const TAB_META: Record<Tab, { label: string; color: string; accent: string }> = {
-  density: { label: 'Arac Yogunlugu', color: '#2f9df4', accent: '#75c2ff' },
+  density: { label: 'Arac Yogunlugu', color: '#22c55e', accent: '#86efac' },
   traffic: { label: 'Trafik Isiklari', color: '#c8a73a', accent: '#e6cf6c' },
   violations: { label: 'Hiz Ihlalleri', color: '#d95757', accent: '#ee8a8a' },
 }
@@ -22,7 +22,7 @@ export default function LivePage() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-dark-900 text-white overflow-hidden">
+    <div className="flex flex-col h-full bg-black text-white overflow-hidden">
       <div className="shrink-0 flex items-center gap-1 px-6 pt-5 pb-0">
         {ALL_TABS.map(tab => {
           const m = TAB_META[tab]

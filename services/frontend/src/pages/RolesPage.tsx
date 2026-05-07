@@ -67,7 +67,7 @@ export default function RolesPage() {
   }, [])
 
   return (
-    <div className="p-8">
+    <div className="p-8 bg-black min-h-screen">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white">Rol Yönetimi</h1>
@@ -77,8 +77,13 @@ export default function RolesPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-slate-400">Yükleniyor...</div>
+        <div className="space-y-4">
+          <div className="h-10 w-40 rounded skeleton" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="h-44 rounded-md skeleton" />
+            <div className="h-44 rounded-md skeleton" />
+            <div className="h-44 rounded-md skeleton" />
+          </div>
         </div>
       ) : error ? (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400">
@@ -94,7 +99,7 @@ export default function RolesPage() {
               return (
                 <div
                   key={role.id}
-                  className={`rounded-md border p-6 ${colors.bg} ${colors.border}`}
+                  className={`rounded-md border p-6 transition-all duration-150 hover:-translate-y-0.5 ${colors.bg} ${colors.border}`}
                 >
                   <div className="flex items-center gap-3 mb-4">
                     <div className={`w-2.5 h-2.5 rounded-full ${colors.dot}`} />
@@ -115,7 +120,7 @@ export default function RolesPage() {
                       perms.map((p) => (
                         <span
                           key={p}
-                          className="text-xs px-2 py-1 rounded-md bg-dark-700 text-slate-300 border border-dark-600"
+                          className="text-xs px-2 py-1 rounded-md bg-[#050505] text-slate-300 border border-warning/30"
                         >
                           {PERMISSION_LABELS[p]?.label || p}
                         </span>
@@ -130,10 +135,10 @@ export default function RolesPage() {
           {/* İzin Matrisi */}
           <div>
             <h2 className="text-lg font-semibold text-white mb-4">İzin Matrisi</h2>
-            <div className="bg-dark-800 rounded-md border border-dark-600 overflow-hidden shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
+            <div className="bg-[#050505] rounded-md border border-primary/30 overflow-hidden shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-dark-600">
+                  <tr className="border-b border-primary/20">
                     <th className="text-left text-xs text-slate-400 font-medium px-6 py-4 uppercase tracking-wider w-64">
                       İzin
                     </th>
@@ -150,9 +155,9 @@ export default function RolesPage() {
                     })}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-dark-600">
+                <tbody className="divide-y divide-primary/20">
                   {Object.entries(PERMISSION_LABELS).map(([perm, info]) => (
-                    <tr key={perm} className="hover:bg-dark-700/30 transition-colors">
+                    <tr key={perm} className="hover:bg-[#0a0a0a] transition-all duration-150">
                       <td className="px-6 py-4">
                         <div className="text-sm text-white font-medium">{info.label}</div>
                         <div className="text-xs text-slate-500 mt-0.5">{info.desc}</div>
@@ -167,7 +172,7 @@ export default function RolesPage() {
                                 OK
                               </span>
                             ) : (
-                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-dark-700 text-slate-600 text-xs">
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#0a0a0a] text-slate-600 text-xs">
                                 -
                               </span>
                             )}

@@ -10,13 +10,13 @@ interface NavBarProps {
 
 const PAGES: { id: Page; icon: string; label: string; color: string; dot: string }[] = [
   { id: 'traffic-lights', icon: '', label: 'Trafik Işıkları',  color: '#c8a73a', dot: 'bg-warning' },
-  { id: 'density',        icon: '', label: 'Araç Yoğunluğu', color: '#2f9df4', dot: 'bg-primary' },
+  { id: 'density',        icon: '', label: 'Araç Yoğunluğu', color: '#22c55e', dot: 'bg-primary' },
   { id: 'violations',     icon: '', label: 'Hız İhlalleri',  color: '#d95757', dot: 'bg-danger' },
 ]
 
 export const NavBar = memo(({ currentPage, onNavigate }: NavBarProps) => (
   <nav className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1
-                  bg-[#111318]/95 backdrop-blur-md border border-white/8 rounded-2xl p-1.5 shadow-2xl">
+                  bg-[#080808]/95 backdrop-blur-md border border-white/8 rounded-2xl p-1.5 shadow-2xl">
     {PAGES.map(p => (
       <button
         key={p.id}

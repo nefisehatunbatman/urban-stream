@@ -293,11 +293,11 @@ export default function ViolationsPage({ onNavigate }: ViolationsPageProps) {
   }, [setOnMessage, flushMap, flushUI])
 
   return (
-    <div className="flex h-screen bg-[#0a0b0e] overflow-hidden select-none text-white">
-      <aside className="w-72 bg-[#111318] border-r border-white/5 p-5 z-20 flex flex-col shrink-0 gap-4 overflow-y-auto custom-scrollbar">
+    <div className="flex h-screen bg-[#000000] overflow-hidden select-none text-white">
+      <aside className="w-72 bg-[#080808] border-r border-white/5 p-5 z-20 flex flex-col shrink-0 gap-4 overflow-y-auto custom-scrollbar">
 
         <div>
-          <h1 className="text-xl font-black text-red-400 italic tracking-tighter">TWINUP CITY</h1>
+          <h1 className="text-xl font-black text-red-400 italic tracking-tighter"></h1>
           <p className="text-[9px] text-slate-600 uppercase tracking-widest mt-0.5">Hız İhlalleri · Anlık İzleme</p>
         </div>
 

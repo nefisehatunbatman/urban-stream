@@ -120,14 +120,21 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-slate-400 text-lg animate-pulse">Veriler yükleniyor...</div>
+      <div className="min-h-screen bg-black p-6 space-y-6">
+        <div className="h-8 w-64 rounded skeleton" />
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="h-24 rounded-md skeleton" />
+          <div className="h-24 rounded-md skeleton" />
+          <div className="h-24 rounded-md skeleton" />
+          <div className="h-24 rounded-md skeleton" />
+        </div>
+        <div className="h-80 rounded-md skeleton" />
       </div>
     )
   }
 
   return (
-    <div className="p-6 space-y-6 bg-dark-900 min-h-screen">
+    <div className="p-6 space-y-6 bg-black min-h-screen">
       <div>
         <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
         <p className="text-slate-500 text-sm mt-1">Son 30 günlük kentsel veri analizi</p>
@@ -145,10 +152,10 @@ export default function DashboardPage() {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors border ${
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-150 border ${
               activeTab === tab
                 ? 'bg-primary/10 border-primary/40 text-white'
-                : 'bg-dark-800 border-dark-600 text-slate-400 hover:text-white hover:bg-dark-700'
+                : 'bg-[#050505] border border-primary/25 text-slate-400 hover:text-white hover:bg-[#0a0a0a]'
             }`}
           >
             {tab === 'density' ? 'Yoğunluk' : tab === 'traffic' ? ' Trafik Lambası' : ' Hız İhlali'}
@@ -156,7 +163,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="bg-dark-800 rounded-md p-5 border border-dark-600 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
+      <div className="bg-[#050505] rounded-md p-5 border border-primary/30 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
         {activeTab === 'density' && (
           <>
             <h3 className="text-white font-medium mb-4">Günlük Araç Yoğunluğu</h3>
@@ -167,7 +174,7 @@ export default function DashboardPage() {
                 <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
                 <Tooltip contentStyle={{ background: '#111418', border: '1px solid #252b31', borderRadius: 6 }} />
                 <Legend />
-                <Line type="monotone" dataKey="avg_vehicles" stroke="#2f9df4" name="Ort. Araç" dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="avg_vehicles" stroke="#22c55e" name="Ort. Araç" dot={false} strokeWidth={2} />
                 <Line type="monotone" dataKey="avg_pedestrians" stroke="#1fb981" name="Ort. Yaya" dot={false} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
@@ -204,8 +211,8 @@ export default function DashboardPage() {
       </div>
 
       {predictions.length > 0 && (
-        <div className="bg-dark-800 rounded-md p-5 border border-dark-600 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
-          <h3 className="text-white font-medium mb-1">AI Tahminleri — Araç Yoğunluğu</h3>
+        <div className="bg-[#050505] rounded-md p-5 border border-primary/30 shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
+          <h3 className="text-white font-medium mb-1">Tahmin Paneli — Araç Yoğunluğu</h3>
           <p className="text-slate-500 text-xs mb-4">
             Gelen verilere göre üretilen 14 günlük projeksiyon — 3 saatlik periyotlar
             (00:00 · 03:00 · 06:00 · 09:00 · 12:00 · 15:00 · 18:00 · 21:00)
@@ -228,7 +235,7 @@ export default function DashboardPage() {
                 labelFormatter={formatHourlyTooltip}
               />
               <Legend />
-              <Line type="monotone" dataKey="yhat" stroke="#2f9df4" name="Tahmin" dot={false} strokeWidth={2} />
+              <Line type="monotone" dataKey="yhat" stroke="#22c55e" name="Tahmin" dot={false} strokeWidth={2} />
               <Line type="monotone" dataKey="yhat_upper" stroke="#78b90099" name="Üst Sınır" dot={false} strokeDasharray="4 4" />
               <Line type="monotone" dataKey="yhat_lower" stroke="#78b90099" name="Alt Sınır" dot={false} strokeDasharray="4 4" />
             </LineChart>
