@@ -55,7 +55,7 @@ func RunMigrations(conn clickhouse.Conn) {
 		// predictions tablosu — ai-service buraya yazar, api-service buradan okur
 		`CREATE TABLE IF NOT EXISTS predictions (
 			channel    String,
-			ds         Date,
+			ds         DateTime,
 			yhat       Float64,
 			yhat_lower Float64,
 			yhat_upper Float64,

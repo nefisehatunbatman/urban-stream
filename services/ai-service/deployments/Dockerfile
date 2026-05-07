@@ -12,7 +12,6 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# CmdStan'ı kur (Prophet'in ihtiyaç duyduğu C++ backend)
 RUN python -c "import cmdstanpy; cmdstanpy.install_cmdstan()"
 
 COPY . .

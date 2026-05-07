@@ -5,56 +5,56 @@ type ReportType = 'density' | 'traffic' | 'violations' | 'air_quality'
 
 const REPORT_CONFIG = {
   density: {
-    label: 'Araç Yoğunluğu',
-    icon: '🚗',
-    color: 'text-indigo-400',
-    border: 'border-indigo-500/30',
-    bg: 'bg-indigo-500/10',
+    label: 'Arac Yogunlugu',
+    code: 'DEN',
+    color: 'text-primary',
+    border: 'border-primary/40',
+    bg: 'bg-primary/10',
     columns: [
       { key: 'ds', label: 'Tarih' },
-      { key: 'avg_vehicles', label: 'Ort. Araç' },
+      { key: 'avg_vehicles', label: 'Ort. Arac' },
       { key: 'avg_pedestrians', label: 'Ort. Yaya' },
-      { key: 'avg_speed', label: 'Ort. Hız (km/h)' },
+      { key: 'avg_speed', label: 'Ort. Hiz (km/h)' },
     ],
   },
   traffic: {
-    label: 'Trafik Lambası',
-    icon: '🚦',
-    color: 'text-yellow-400',
-    border: 'border-yellow-500/30',
-    bg: 'bg-yellow-500/10',
+    label: 'Trafik Lambasi',
+    code: 'TRF',
+    color: 'text-warning',
+    border: 'border-warning/40',
+    bg: 'bg-warning/10',
     columns: [
       { key: 'ds', label: 'Tarih' },
       { key: 'total_lamps', label: 'Toplam Lamba' },
-      { key: 'malfunction_count', label: 'Arıza Sayısı' },
-      { key: 'malfunction_rate', label: 'Arıza Oranı' },
+      { key: 'malfunction_count', label: 'Ariza Sayisi' },
+      { key: 'malfunction_rate', label: 'Ariza Orani' },
     ],
   },
   violations: {
-    label: 'Hız İhlalleri',
-    icon: '⚡',
-    color: 'text-red-400',
-    border: 'border-red-500/30',
-    bg: 'bg-red-500/10',
+    label: 'Hiz Ihlalleri',
+    code: 'SPD',
+    color: 'text-danger',
+    border: 'border-danger/40',
+    bg: 'bg-danger/10',
     columns: [
       { key: 'ds', label: 'Tarih' },
-      { key: 'violation_count', label: 'İhlal Sayısı' },
-      { key: 'avg_speed', label: 'Ort. Hız (km/h)' },
-      { key: 'max_speed', label: 'Max Hız (km/h)' },
+      { key: 'violation_count', label: 'Ihlal Sayisi' },
+      { key: 'avg_speed', label: 'Ort. Hiz (km/h)' },
+      { key: 'max_speed', label: 'Max Hiz (km/h)' },
     ],
   },
   air_quality: {
     label: 'Hava Kalitesi',
-    icon: '🌿',
-    color: 'text-green-400',
-    border: 'border-green-500/30',
-    bg: 'bg-green-500/10',
+    code: 'AIR',
+    color: 'text-success',
+    border: 'border-success/40',
+    bg: 'bg-success/10',
     columns: [
       { key: 'ds', label: 'Tarih' },
-      { key: 'avg_co2', label: 'Ort. CO₂' },
-      { key: 'avg_no2', label: 'Ort. NO₂' },
+      { key: 'avg_co2', label: 'Ort. CO2' },
+      { key: 'avg_no2', label: 'Ort. NO2' },
       { key: 'avg_aqi', label: 'Ort. AQI' },
-      { key: 'avg_temp', label: 'Ort. Sıcaklık (°C)' },
+      { key: 'avg_temp', label: 'Ort. Sicaklik (C)' },
     ],
   },
 }
@@ -80,7 +80,7 @@ export default function ReportsPage() {
       else res = await getAirQuality(days)
       setData(res.data.data || [])
     } catch {
-      setError('Veriler yüklenemedi. Analytics servisi çalışıyor mu?')
+      setError('Veriler yuklenemedi. Analytics servisi calisiyor mu?')
     } finally {
       setLoading(false)
     }
@@ -97,7 +97,7 @@ export default function ReportsPage() {
       config.columns.map((c) => {
         const val = row[c.key]
         if (typeof val === 'number') return val.toFixed(2)
-        return val ?? '—'
+        return val ?? '-'
       }).join(',')
     )
     const csv = [headers, ...rows].join('\n')
@@ -119,19 +119,19 @@ export default function ReportsPage() {
         <meta charset="utf-8">
         <title>${config.label} Raporu</title>
         <style>
-          body { font-family: Arial, sans-serif; padding: 32px; color: #1a1a2e; }
+          body { font-family: Arial, sans-serif; padding: 32px; color: #111827; }
           h1 { font-size: 22px; margin-bottom: 4px; }
           p { font-size: 12px; color: #666; margin-bottom: 24px; }
           table { width: 100%; border-collapse: collapse; font-size: 12px; }
-          th { background: #1a1a2e; color: white; padding: 10px 12px; text-align: left; }
+          th { background: #111418; color: white; padding: 10px 12px; text-align: left; }
           td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; }
           tr:nth-child(even) td { background: #f9fafb; }
-          .footer { margin-top: 24px; font-size: 10px; color: #999; }
+          .footer { margin-top: 24px; font-size: 10px; color: #777; }
         </style>
       </head>
       <body>
-        <h1>${config.icon} ${config.label} Raporu</h1>
-        <p>Son ${days} gün · UrbanStream Kentsel Veri Analitiği · ${new Date().toLocaleDateString('tr-TR')}</p>
+        <h1>${config.label} Raporu</h1>
+        <p>Son ${days} gun - UrbanStream Kentsel Veri Analitigi - ${new Date().toLocaleDateString('tr-TR')}</p>
         <table>
           <thead>
             <tr>${config.columns.map((c) => `<th>${c.label}</th>`).join('')}</tr>
@@ -140,12 +140,12 @@ export default function ReportsPage() {
             ${data.map((row) => `
               <tr>${config.columns.map((c) => {
                 const val = row[c.key]
-                return `<td>${typeof val === 'number' ? val.toFixed(2) : (val ?? '—')}</td>`
+                return `<td>${typeof val === 'number' ? val.toFixed(2) : (val ?? '-')}</td>`
               }).join('')}</tr>
             `).join('')}
           </tbody>
         </table>
-        <div class="footer">Toplam ${data.length} kayıt · Oluşturulma: ${new Date().toLocaleString('tr-TR')}</div>
+        <div class="footer">Toplam ${data.length} kayit - Olusturulma: ${new Date().toLocaleString('tr-TR')}</div>
       </body>
       </html>
     `
@@ -160,32 +160,30 @@ export default function ReportsPage() {
   const config = REPORT_CONFIG[activeReport]
 
   return (
-    <div className="p-8">
-      {/* Header */}
+    <div className="p-8 bg-dark-900 min-h-screen">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-white">Raporlar</h1>
-          <p className="text-slate-400 mt-1">ClickHouse verilerinden analitik raporlar</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Raporlar</h1>
+          <p className="text-slate-500 mt-1">ClickHouse verilerinden analitik raporlar</p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={handleExportCSV}
             disabled={data.length === 0}
-            className="flex items-center gap-2 bg-dark-700 hover:bg-dark-600 text-slate-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40"
+            className="bg-dark-700 hover:bg-dark-600 border border-dark-600 text-slate-300 px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-40"
           >
-            📥 CSV İndir
+            CSV Indir
           </button>
           <button
             onClick={handleExportPDF}
             disabled={data.length === 0}
-            className="flex items-center gap-2 bg-primary hover:bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40"
+            className="bg-primary/20 hover:bg-primary/30 border border-primary/40 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-40"
           >
-            🖨️ PDF / Yazdır
+            PDF / Yazdir
           </button>
         </div>
       </div>
 
-      {/* Report Type Tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">
         {(Object.keys(REPORT_CONFIG) as ReportType[]).map((type) => {
           const c = REPORT_CONFIG[type]
@@ -193,57 +191,55 @@ export default function ReportsPage() {
             <button
               key={type}
               onClick={() => setActiveReport(type)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors border ${
                 activeReport === type
                   ? `${c.bg} ${c.border} ${c.color}`
-                  : 'bg-dark-700 border-dark-600 text-slate-400 hover:text-white'
+                  : 'bg-dark-800 border-dark-600 text-slate-400 hover:text-white hover:bg-dark-700'
               }`}
             >
-              <span>{c.icon}</span>
+              <span className="text-[10px] font-bold tracking-wider">{c.code}</span>
               {c.label}
             </button>
           )
         })}
       </div>
 
-      {/* Controls */}
       <div className="flex items-center gap-4 mb-6">
-        <span className="text-sm text-slate-400">Zaman Aralığı:</span>
+        <span className="text-sm text-slate-400">Zaman Araligi:</span>
         <div className="flex gap-2">
           {DAY_OPTIONS.map((d) => (
             <button
               key={d}
               onClick={() => setDays(d)}
-              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
                 days === d
-                  ? 'bg-primary text-white'
-                  : 'bg-dark-700 text-slate-400 hover:text-white'
+                  ? 'bg-primary/10 border-primary/40 text-white'
+                  : 'bg-dark-800 border-dark-600 text-slate-400 hover:text-white hover:bg-dark-700'
               }`}
             >
-              {d} gün
+              {d} gun
             </button>
           ))}
         </div>
         <span className="text-xs text-slate-500 ml-auto">
-          {data.length} kayıt
+          {data.length} kayit
         </span>
       </div>
 
-      {/* Table */}
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="text-slate-400 animate-pulse">Yükleniyor...</div>
+          <div className="text-slate-400 animate-pulse">Yukleniyor...</div>
         </div>
       ) : error ? (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-4 text-red-400 text-sm">
+        <div className="bg-danger/10 border border-danger/30 rounded-md px-4 py-4 text-danger text-sm">
           {error}
         </div>
       ) : (
-        <div ref={tableRef} className="bg-dark-800 rounded-xl border border-dark-600 overflow-hidden">
+        <div ref={tableRef} className="bg-dark-800 rounded-md border border-dark-600 overflow-hidden shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-dark-600">
+                <tr className="border-b border-dark-600 bg-dark-700/60">
                   {config.columns.map((col) => (
                     <th
                       key={col.key}
@@ -261,23 +257,23 @@ export default function ReportsPage() {
                       colSpan={config.columns.length}
                       className="text-center text-slate-500 py-16"
                     >
-                      Veri bulunamadı
+                      Veri bulunamadi
                     </td>
                   </tr>
                 ) : (
                   data.map((row, i) => (
-                    <tr key={i} className="hover:bg-dark-700/40 transition-colors">
+                    <tr key={i} className="hover:bg-dark-700/45 transition-colors">
                       {config.columns.map((col) => {
                         const val = row[col.key]
                         return (
                           <td key={col.key} className="px-6 py-3 text-sm text-slate-300">
                             {col.key === 'ds'
-                              ? String(val ?? '—').slice(0, 10)
+                              ? String(val ?? '-').slice(0, 10)
                               : col.key.includes('rate')
                               ? `%${(Number(val) * 100).toFixed(2)}`
                               : typeof val === 'number'
                               ? val.toFixed(2)
-                              : val ?? '—'}
+                              : val ?? '-'}
                           </td>
                         )
                       })}

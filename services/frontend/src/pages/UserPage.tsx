@@ -18,8 +18,8 @@ interface Role {
 }
 
 const ROLE_COLORS: Record<string, string> = {
-  admin: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
-  operator: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+  admin: 'bg-primary/10 text-primary border-primary/40',
+  operator: 'bg-success/10 text-success border-success/40',
   viewer: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
 }
 
@@ -121,7 +121,7 @@ export default function UsersPage() {
         {canManage && (
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 bg-primary hover:bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-medium transition-colors"
+            className="flex items-center gap-2 bg-primary/20 hover:bg-primary/30 border border-primary/40 text-white px-5 py-2.5 rounded-md font-medium transition-colors"
           >
             <span className="text-lg leading-none">+</span>
             Yeni Kullanıcı
@@ -136,7 +136,7 @@ export default function UsersPage() {
           placeholder="Email veya isim ara..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-sm bg-dark-800 border border-dark-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-primary text-sm"
+          className="w-full max-w-sm bg-dark-800 border border-dark-600 rounded-md px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-primary text-sm"
         />
       </div>
 
@@ -150,7 +150,7 @@ export default function UsersPage() {
           {error}
         </div>
       ) : (
-        <div className="bg-dark-800 rounded-xl border border-dark-600 overflow-hidden">
+        <div className="bg-dark-800 rounded-md border border-dark-600 overflow-hidden shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
           <table className="w-full">
             <thead>
               <tr className="border-b border-dark-600">
@@ -223,7 +223,7 @@ export default function UsersPage() {
                             const currentRole = roles.find((r) => r.name === user.role)
                             setSelectedRoleId(currentRole?.id || 0)
                           }}
-                          className="text-xs text-primary hover:text-indigo-400 font-medium transition-colors"
+                          className="text-xs text-primary hover:text-accent font-medium transition-colors"
                         >
                           Rol Değiştir
                         </button>
@@ -240,7 +240,7 @@ export default function UsersPage() {
       {/* Yeni Kullanıcı Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-800 rounded-2xl border border-dark-600 w-full max-w-md p-6">
+          <div className="bg-dark-800 rounded-md border border-dark-600 w-full max-w-md p-6">
             <h2 className="text-lg font-semibold text-white mb-6">Yeni Kullanıcı Ekle</h2>
             <form onSubmit={handleAddUser} className="space-y-4">
               <div>
@@ -297,7 +297,7 @@ export default function UsersPage() {
                 <button
                   type="submit"
                   disabled={addLoading}
-                  className="flex-1 bg-primary hover:bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                  className="flex-1 bg-primary/20 hover:bg-primary/30 border border-primary/40 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 >
                   {addLoading ? 'Oluşturuluyor...' : 'Oluştur'}
                 </button>
@@ -310,7 +310,7 @@ export default function UsersPage() {
       {/* Rol Atama Modal */}
       {assignTarget && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-800 rounded-2xl border border-dark-600 w-full max-w-sm p-6">
+          <div className="bg-dark-800 rounded-md border border-dark-600 w-full max-w-sm p-6">
             <h2 className="text-lg font-semibold text-white mb-1">Rol Değiştir</h2>
             <p className="text-sm text-slate-400 mb-6">
               {assignTarget.full_name || assignTarget.email}
@@ -331,7 +331,7 @@ export default function UsersPage() {
                     {ROLE_LABELS[role.name] || role.name}
                   </span>
                   {selectedRoleId === role.id && (
-                    <span className="text-primary text-xs">✓ Seçili</span>
+                    <span className="text-primary text-xs">Secili</span>
                   )}
                 </button>
               ))}
@@ -347,7 +347,7 @@ export default function UsersPage() {
               <button
                 onClick={handleAssignRole}
                 disabled={assignLoading || !selectedRoleId}
-                className="flex-1 bg-primary hover:bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                className="flex-1 bg-primary/20 hover:bg-primary/30 border border-primary/40 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {assignLoading ? 'Kaydediliyor...' : 'Kaydet'}
               </button>

@@ -63,12 +63,27 @@ func (h *APIHandler) GetPredictions(w http.ResponseWriter, r *http.Request) {
 	if channel == "" {
 		channel = "density"
 	}
-	data, err := h.queries.GetPredictions(channel)
+	metric := r.URL.Query().Get("metric")
+	if metric == "" {
+		metric = defaultPredictionMetric(channel)
+	}
+	data, err := h.queries.GetPredictions(channel, metric)
 	if err != nil {
 		pkg.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	pkg.JSON(w, http.StatusOK, data)
+}
+
+func defaultPredictionMetric(channel string) string {
+	switch channel {
+	case "speed_violations":
+		return "violation_count"
+	case "traffic_lights":
+		return "malfunction_rate"
+	default:
+		return "avg_vehicles"
+	}
 }
 
 func (h *APIHandler) GetAnalysis(w http.ResponseWriter, r *http.Request) {

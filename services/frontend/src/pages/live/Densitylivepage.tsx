@@ -99,14 +99,14 @@ export default function DensityLivePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-black tracking-tight text-indigo-300">Araç Yoğunluğu</h2>
+          <h2 className="text-lg font-black tracking-tight text-primary">Araç Yoğunluğu</h2>
           <p className="text-[10px] text-slate-600 uppercase tracking-widest mt-0.5">Anlık · {MAX_POINTS}s pencere</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-[9px] font-mono text-slate-600">{msgCount.toLocaleString()} mesaj</span>
           <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest
-            ${connected ? 'bg-indigo-500/10 text-indigo-400' : 'bg-red-500/10 text-red-400'}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-indigo-400 animate-pulse' : 'bg-red-400'}`} />
+            ${connected ? 'bg-primary/10 text-primary' : 'bg-danger/10 text-danger'}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-primary animate-pulse' : 'bg-danger'}`} />
             {connected ? 'Canlı' : 'Bağlantı Yok'}
           </div>
         </div>

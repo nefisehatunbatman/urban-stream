@@ -149,6 +149,8 @@ services:
       - FORECAST_DAYS=14
       - SCHEDULER_HOUR=0
       - SCHEDULER_MINUTE=0
+      - RUN_ON_STARTUP=true
+      - TZ=Europe/Istanbul
 
   postgres:
     image: postgres:16-alpine

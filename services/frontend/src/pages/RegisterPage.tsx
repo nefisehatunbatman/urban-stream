@@ -36,12 +36,12 @@ export default function RegisterPage() {
           <p className="text-slate-400 mt-2">Kentsel Veri Analitiği Platformu</p>
         </div>
 
-        <div className="bg-dark-800 rounded-2xl p-8 border border-dark-600">
+        <div className="bg-dark-800 rounded-md p-8 border border-dark-600 shadow-[0_18px_38px_rgba(0,0,0,0.3)]">
           <h2 className="text-xl font-semibold text-white mb-6">Hesap Oluştur</h2>
 
           {success ? (
-            <div className="bg-green-500/10 border border-green-500/30 rounded-lg px-4 py-4 text-green-400 text-sm text-center">
-              ✓ Kayıt başarılı! Giriş sayfasına yönlendiriliyorsunuz...
+            <div className="bg-success/10 border border-success/30 rounded-md px-4 py-4 text-success text-sm text-center">
+              Kayıt başarılı. Giriş sayfasına yönlendiriliyorsunuz...
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -51,7 +51,7 @@ export default function RegisterPage() {
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-dark-700 border border-dark-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-primary"
+                  className="w-full bg-dark-700 border border-dark-600 rounded-md px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-primary"
                   placeholder="Ali Veli"
                 />
               </div>
@@ -62,7 +62,7 @@ export default function RegisterPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-dark-700 border border-dark-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-primary"
+                  className="w-full bg-dark-700 border border-dark-600 rounded-md px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-primary"
                   placeholder="ornek@mail.com"
                   required
                 />
@@ -74,7 +74,7 @@ export default function RegisterPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-dark-700 border border-dark-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-primary"
+                  className="w-full bg-dark-700 border border-dark-600 rounded-md px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-primary"
                   placeholder="En az 6 karakter"
                   required
                   minLength={6}
@@ -86,7 +86,7 @@ export default function RegisterPage() {
               </p>
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400 text-sm">
+              <div className="bg-danger/10 border border-danger/30 rounded-md px-4 py-3 text-danger text-sm">
                   {error}
                 </div>
               )}
@@ -94,7 +94,7 @@ export default function RegisterPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-primary hover:bg-indigo-600 text-white font-medium py-3 rounded-lg transition-colors disabled:opacity-50"
+                className="w-full bg-primary/20 hover:bg-primary/30 border border-primary/40 text-white font-medium py-3 rounded-md transition-colors disabled:opacity-50"
               >
                 {loading ? 'Kayıt yapılıyor...' : 'Kayıt Ol'}
               </button>
@@ -103,7 +103,7 @@ export default function RegisterPage() {
 
           <p className="text-center text-sm text-slate-500 mt-6">
             Zaten hesabın var mı?{' '}
-            <Link to="/login" className="text-primary hover:text-indigo-400 transition-colors">
+            <Link to="/login" className="text-primary hover:text-accent transition-colors">
               Giriş Yap
             </Link>
           </p>

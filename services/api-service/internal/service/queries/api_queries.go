@@ -139,14 +139,20 @@ func (q *APIQueries) GetSpeedViolations(days int) ([]dto.SpeedViolationRecord, e
 	return records, nil
 }
 
-func (q *APIQueries) GetPredictions(channel string) ([]dto.PredictionRecord, error) {
+func (q *APIQueries) GetPredictions(channel string, metric string) ([]dto.PredictionRecord, error) {
 	query := `
 		SELECT channel, toString(ds), yhat, yhat_lower, yhat_upper, metric
 		FROM predictions
-		WHERE channel = ?
+		WHERE channel = ? AND metric = ?
+		  AND created_at >= (
+		      SELECT max(created_at) - INTERVAL 1 MINUTE
+		      FROM predictions
+		      WHERE channel = ? AND metric = ?
+		  )
+		  AND toHour(ds) IN (0, 3, 6, 9, 12, 15, 18, 21)
 		ORDER BY ds ASC
 	`
-	rows, err := q.db.Query(context.Background(), query, channel)
+	rows, err := q.db.Query(context.Background(), query, channel, metric, channel, metric)
 	if err != nil {
 		return nil, err
 	}

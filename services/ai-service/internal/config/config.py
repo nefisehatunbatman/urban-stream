@@ -17,3 +17,6 @@ class Config:
     # Scheduler her gece saat kaçta çalışacak
     SCHEDULER_HOUR = int(os.getenv("SCHEDULER_HOUR", "0"))
     SCHEDULER_MINUTE = int(os.getenv("SCHEDULER_MINUTE", "0"))
+
+    # Servis kisa sureli calistirildiginda da tahmin gorunsun.
+    RUN_ON_STARTUP = os.getenv("RUN_ON_STARTUP", "true").lower() == "true"

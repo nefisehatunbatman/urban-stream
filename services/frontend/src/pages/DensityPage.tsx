@@ -254,7 +254,7 @@ export default function DensityPage({ onNavigate }: DensityPageProps) {
     <div className="flex h-screen bg-[#0a0b0e] overflow-hidden select-none text-white">
       <aside className="w-72 bg-[#111318] border-r border-white/5 p-5 z-20 flex flex-col shrink-0 gap-4 overflow-y-auto custom-scrollbar">
         <div>
-          <h1 className="text-xl font-black text-orange-400 italic tracking-tighter">TWINUP CITY</h1>
+          <h1 className="text-xl font-black text-primary italic tracking-tighter">TWINUP CITY</h1>
           <p className="text-[9px] text-slate-600 uppercase tracking-widest mt-0.5">Araç Yoğunluğu · Isı Haritası</p>
         </div>
 
@@ -266,7 +266,7 @@ export default function DensityPage({ onNavigate }: DensityPageProps) {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
             <span className="text-[9px] text-slate-500 font-mono">{zoneStats.length} aktif bölge</span>
           </div>
           <div className="flex items-center gap-2">
@@ -289,7 +289,7 @@ export default function DensityPage({ onNavigate }: DensityPageProps) {
 
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-white/3 rounded-xl p-3 border border-white/5">
-            <p className="text-[18px] font-black text-orange-400 leading-none">{totalVehicles.toLocaleString('tr-TR')}</p>
+            <p className="text-[18px] font-black text-primary leading-none">{totalVehicles.toLocaleString('tr-TR')}</p>
             <p className="text-[7px] text-slate-600 uppercase mt-1">Toplam Araç</p>
           </div>
           <div className="bg-white/3 rounded-xl p-3 border border-white/5">

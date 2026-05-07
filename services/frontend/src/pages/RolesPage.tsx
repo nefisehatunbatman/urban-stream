@@ -9,16 +9,16 @@ interface Role {
 
 const ROLE_COLORS: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   admin: {
-    bg: 'bg-violet-500/10',
-    text: 'text-violet-300',
-    border: 'border-violet-500/30',
-    dot: 'bg-violet-400',
+    bg: 'bg-primary/10',
+    text: 'text-primary',
+    border: 'border-primary/30',
+    dot: 'bg-primary',
   },
   operator: {
-    bg: 'bg-blue-500/10',
-    text: 'text-blue-300',
-    border: 'border-blue-500/30',
-    dot: 'bg-blue-400',
+    bg: 'bg-success/10',
+    text: 'text-success',
+    border: 'border-success/30',
+    dot: 'bg-success',
   },
   viewer: {
     bg: 'bg-slate-500/10',
@@ -94,7 +94,7 @@ export default function RolesPage() {
               return (
                 <div
                   key={role.id}
-                  className={`rounded-xl border p-6 ${colors.bg} ${colors.border}`}
+                  className={`rounded-md border p-6 ${colors.bg} ${colors.border}`}
                 >
                   <div className="flex items-center gap-3 mb-4">
                     <div className={`w-2.5 h-2.5 rounded-full ${colors.dot}`} />
@@ -130,7 +130,7 @@ export default function RolesPage() {
           {/* İzin Matrisi */}
           <div>
             <h2 className="text-lg font-semibold text-white mb-4">İzin Matrisi</h2>
-            <div className="bg-dark-800 rounded-xl border border-dark-600 overflow-hidden">
+            <div className="bg-dark-800 rounded-md border border-dark-600 overflow-hidden shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-dark-600">
@@ -163,12 +163,12 @@ export default function RolesPage() {
                         return (
                           <td key={role.id} className="px-6 py-4 text-center">
                             {has ? (
-                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500/20 text-green-400 text-xs">
-                                ✓
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-success/20 text-success text-[10px]">
+                                OK
                               </span>
                             ) : (
                               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-dark-700 text-slate-600 text-xs">
-                                —
+                                -
                               </span>
                             )}
                           </td>

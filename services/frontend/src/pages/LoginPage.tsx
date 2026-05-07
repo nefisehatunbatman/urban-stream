@@ -42,7 +42,7 @@ export default function LoginPage() {
         </div>
 
         {/* Form */}
-        <div className="bg-dark-800 rounded-2xl p-8 border border-dark-600">
+        <div className="bg-dark-800 rounded-md p-8 border border-dark-600 shadow-[0_18px_38px_rgba(0,0,0,0.3)]">
           <h2 className="text-xl font-semibold text-white mb-6">Giriş Yap</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -52,7 +52,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-dark-700 border border-dark-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-primary"
+                className="w-full bg-dark-700 border border-dark-600 rounded-md px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-primary"
                 placeholder="ornek@mail.com"
                 required
               />
@@ -64,14 +64,14 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-dark-700 border border-dark-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-primary"
+                className="w-full bg-dark-700 border border-dark-600 rounded-md px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-primary"
                 placeholder="••••••"
                 required
               />
             </div>
 
             {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400 text-sm">
+              <div className="bg-danger/10 border border-danger/30 rounded-md px-4 py-3 text-danger text-sm">
                 {error}
               </div>
             )}
@@ -79,7 +79,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary hover:bg-indigo-600 text-white font-medium py-3 rounded-lg transition-colors disabled:opacity-50"
+              className="w-full bg-primary/20 hover:bg-primary/30 border border-primary/40 text-white font-medium py-3 rounded-md transition-colors disabled:opacity-50"
             >
               {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
             </button>
@@ -87,7 +87,7 @@ export default function LoginPage() {
 
           <p className="text-center text-sm text-slate-500 mt-6">
             Hesabın yok mu?{' '}
-            <Link to="/register" className="text-primary hover:text-indigo-400 transition-colors">
+            <Link to="/register" className="text-primary hover:text-accent transition-colors">
               Kayıt Ol
             </Link>
           </p>

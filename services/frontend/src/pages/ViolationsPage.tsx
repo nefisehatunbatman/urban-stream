@@ -86,7 +86,7 @@ const ViolationCard = memo(({ v }: { v: Violation }) => {
   const sev = v.speed > 120 ? 'critical' : v.speed > 90 ? 'high' : 'medium'
   const s = {
     critical: { bg: 'bg-red-500/10',    border: 'border-red-500/30',    color: '#ef4444', label: 'KRİTİK' },
-    high:     { bg: 'bg-orange-500/10', border: 'border-orange-500/25', color: '#f97316', label: 'YÜKSEK' },
+    high:     { bg: 'bg-warning/10', border: 'border-warning/25', color: '#c8a73a', label: 'YÜKSEK' },
     medium:   { bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', color: '#f59e0b', label: 'ORTA'   },
   }[sev]
   return (
@@ -333,7 +333,7 @@ export default function ViolationsPage({ onNavigate }: ViolationsPageProps) {
         <div className="grid grid-cols-3 gap-2">
           {[
             { val: ui.total,    color: 'text-red-400',    label: 'Toplam'   },
-            { val: ui.critical, color: 'text-orange-400', label: 'Kritik'   },
+            { val: ui.critical, color: 'text-warning', label: 'Kritik'   },
             { val: ui.maxSpeed, color: 'text-yellow-400', label: 'Max km/h' },
           ].map(s => (
             <div key={s.label} className="bg-white/3 rounded-xl p-2 border border-white/5 text-center">
