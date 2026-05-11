@@ -50,6 +50,7 @@ const DAY_OPTIONS = [7, 14, 30, 60, 90]
 export default function ReportsPage() {
   const [activeReport, setActiveReport] = useState<ReportType>('density')
   const [days, setDays] = useState(30)
+  const [resolution, setResolution] = useState<'daily' | 'hourly'>('daily')
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -60,9 +61,9 @@ export default function ReportsPage() {
     setError('')
     try {
       let res
-      if (activeReport === 'density') res = await getDensity(days)
-      else if (activeReport === 'traffic') res = await getTrafficLights(days)
-      else res = await getSpeedViolations(days)
+      if (activeReport === 'density') res = await getDensity(days, resolution)
+      else if (activeReport === 'traffic') res = await getTrafficLights(days, resolution)
+      else res = await getSpeedViolations(days, resolution)
       setData(res.data.data || [])
     } catch {
       setError('Veriler yüklenemedi. Analytics servisi çalışıyor mu?')
@@ -73,7 +74,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     fetchReport()
-  }, [activeReport, days])
+  }, [activeReport, days, resolution])
 
   const handleExportCSV = () => {
     const config = REPORT_CONFIG[activeReport]
@@ -206,6 +207,27 @@ export default function ReportsPage() {
             </button>
           ))}
         </div>
+
+        <span className="text-sm text-slate-400 ml-4">Görünüm:</span>
+        <div className="flex gap-2 bg-[#050505] border border-primary/20 p-1 rounded-md">
+          <button
+            onClick={() => setResolution('daily')}
+            className={`px-4 py-1 rounded text-sm transition-colors ${
+              resolution === 'daily' ? 'bg-primary/20 text-white' : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            Günlük
+          </button>
+          <button
+            onClick={() => setResolution('hourly')}
+            className={`px-4 py-1 rounded text-sm transition-colors ${
+              resolution === 'hourly' ? 'bg-primary/20 text-white' : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            Saatlik
+          </button>
+        </div>
+
         <span className="text-xs text-slate-500 ml-auto">
           {data.length} kayıt
         </span>
@@ -253,7 +275,7 @@ export default function ReportsPage() {
                         return (
                           <td key={col.key} className="px-6 py-3 text-sm text-slate-300">
                             {col.key === 'ds'
-                              ? String(val ?? '-').slice(0, 10)
+                              ? String(val ?? '-').slice(0, resolution === 'hourly' ? 16 : 10)
                               : col.key.includes('rate')
                               ? `%${(Number(val) * 100).toFixed(2)}`
                               : typeof val === 'number'

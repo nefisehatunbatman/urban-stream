@@ -20,7 +20,8 @@ func NewAPIHandler(q *queries.APIQueries, hub *commands.Hub) *APIHandler {
 
 func (h *APIHandler) GetDensity(w http.ResponseWriter, r *http.Request) {
 	days := getDays(r, 30)
-	data, err := h.queries.GetDensity(days)
+	resolution := r.URL.Query().Get("resolution")
+	data, err := h.queries.GetDensity(days, resolution)
 	if err != nil {
 		pkg.Error(w, http.StatusInternalServerError, err.Error())
 		return
@@ -40,7 +41,8 @@ func (h *APIHandler) GetHourlyDensity(w http.ResponseWriter, r *http.Request) {
 
 func (h *APIHandler) GetTrafficLights(w http.ResponseWriter, r *http.Request) {
 	days := getDays(r, 30)
-	data, err := h.queries.GetTrafficLights(days)
+	resolution := r.URL.Query().Get("resolution")
+	data, err := h.queries.GetTrafficLights(days, resolution)
 	if err != nil {
 		pkg.Error(w, http.StatusInternalServerError, err.Error())
 		return
@@ -50,7 +52,8 @@ func (h *APIHandler) GetTrafficLights(w http.ResponseWriter, r *http.Request) {
 
 func (h *APIHandler) GetSpeedViolations(w http.ResponseWriter, r *http.Request) {
 	days := getDays(r, 30)
-	data, err := h.queries.GetSpeedViolations(days)
+	resolution := r.URL.Query().Get("resolution")
+	data, err := h.queries.GetSpeedViolations(days, resolution)
 	if err != nil {
 		pkg.Error(w, http.StatusInternalServerError, err.Error())
 		return

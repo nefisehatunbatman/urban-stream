@@ -71,17 +71,17 @@ export const updateRolePermissions = (roleId: number, permissions: string[]) =>
   api.put(`/roles/${roleId}`, { permissions })
 
 // Analytics (ClickHouse servisi)
-export const getDensity = (days = 30) =>
-  analyticsApi.get(`/api/density?days=${days}`)
+export const getDensity = (days = 30, resolution = 'daily') =>
+  analyticsApi.get(`/api/density?days=${days}&resolution=${resolution}`)
 
 export const getHourlyDensity = (days = 30) =>
   analyticsApi.get(`/api/density/hourly?days=${days}`)
 
-export const getTrafficLights = (days = 30) =>
-  analyticsApi.get(`/api/traffic-lights?days=${days}`)
+export const getTrafficLights = (days = 30, resolution = 'daily') =>
+  analyticsApi.get(`/api/traffic-lights?days=${days}&resolution=${resolution}`)
 
-export const getSpeedViolations = (days = 30) =>
-  analyticsApi.get(`/api/speed-violations?days=${days}`)
+export const getSpeedViolations = (days = 30, resolution = 'daily') =>
+  analyticsApi.get(`/api/speed-violations?days=${days}&resolution=${resolution}`)
 
 export const getAirQuality = (days = 30) =>
   analyticsApi.get(`/api/density?days=${days}`) // air-quality ayrı endpoint yok

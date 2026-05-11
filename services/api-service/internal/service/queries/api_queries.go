@@ -18,10 +18,15 @@ func NewAPIQueries(db driver.Conn) *APIQueries {
 	return &APIQueries{db: db}
 }
 
-func (q *APIQueries) GetDensity(days int) ([]dto.DensityRecord, error) {
+func (q *APIQueries) GetDensity(days int, resolution string) ([]dto.DensityRecord, error) {
+	timeGroup := "toString(toDate(created_at))"
+	if resolution == "hourly" {
+		timeGroup = "toString(toStartOfHour(created_at))"
+	}
+
 	query := fmt.Sprintf(`
 		SELECT
-			toString(toDate(created_at)) AS ds,
+			%s                           AS ds,
 			avg(vehicle_count)           AS avg_vehicles,
 			avg(avg_speed)               AS avg_speed,
 			avg(pedestrian_count)        AS avg_pedestrians,
@@ -30,7 +35,7 @@ func (q *APIQueries) GetDensity(days int) ([]dto.DensityRecord, error) {
 		WHERE created_at >= now() - INTERVAL %d DAY
 		GROUP BY ds
 		ORDER BY ds DESC
-	`, days)
+	`, timeGroup, days)
 
 	rows, err := q.db.Query(context.Background(), query)
 	if err != nil {
@@ -79,10 +84,15 @@ func (q *APIQueries) GetHourlyDensity(days int) ([]dto.HourlyDensity, error) {
 	return records, nil
 }
 
-func (q *APIQueries) GetTrafficLights(days int) ([]dto.TrafficLightRecord, error) {
+func (q *APIQueries) GetTrafficLights(days int, resolution string) ([]dto.TrafficLightRecord, error) {
+	timeGroup := "toString(toDate(created_at))"
+	if resolution == "hourly" {
+		timeGroup = "toString(toStartOfHour(created_at))"
+	}
+
 	query := fmt.Sprintf(`
 		SELECT
-			toString(toDate(created_at))                        AS ds,
+			%s                                                  AS ds,
 			count()                                             AS total_count,
 			countIf(is_malfunctioning = 1)                      AS malfunction_count,
 			countIf(is_malfunctioning = 1) / count()            AS malfunction_rate
@@ -90,7 +100,7 @@ func (q *APIQueries) GetTrafficLights(days int) ([]dto.TrafficLightRecord, error
 		WHERE created_at >= now() - INTERVAL %d DAY
 		GROUP BY ds
 		ORDER BY ds DESC
-	`, days)
+	`, timeGroup, days)
 
 	rows, err := q.db.Query(context.Background(), query)
 	if err != nil {
@@ -109,10 +119,15 @@ func (q *APIQueries) GetTrafficLights(days int) ([]dto.TrafficLightRecord, error
 	return records, nil
 }
 
-func (q *APIQueries) GetSpeedViolations(days int) ([]dto.SpeedViolationRecord, error) {
+func (q *APIQueries) GetSpeedViolations(days int, resolution string) ([]dto.SpeedViolationRecord, error) {
+	timeGroup := "toString(toDate(created_at))"
+	if resolution == "hourly" {
+		timeGroup = "toString(toStartOfHour(created_at))"
+	}
+
 	query := fmt.Sprintf(`
 		SELECT
-			toString(toDate(created_at)) AS ds,
+			%s                           AS ds,
 			count()                      AS violation_count,
 			avg(speed)                   AS avg_speed,
 			max(speed)                   AS max_speed
@@ -120,7 +135,7 @@ func (q *APIQueries) GetSpeedViolations(days int) ([]dto.SpeedViolationRecord, e
 		WHERE created_at >= now() - INTERVAL %d DAY
 		GROUP BY ds
 		ORDER BY ds DESC
-	`, days)
+	`, timeGroup, days)
 
 	rows, err := q.db.Query(context.Background(), query)
 	if err != nil {
