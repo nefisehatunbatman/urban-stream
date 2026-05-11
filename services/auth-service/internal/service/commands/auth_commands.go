@@ -27,7 +27,7 @@ func NewAuthCommands(db *sql.DB, jwtService *JWTService, refreshDays int) *AuthC
 	}
 }
 
-func (c *AuthCommands) Register(req dto.RegisterRequest) (*dto.TokenResponse, error) {
+func (c *AuthCommands) Register(req dto.RegisterRequest, isAdmin bool) (*dto.TokenResponse, error) {
 	// Email var mı?
 	var exists bool
 	err := c.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email=$1)", req.Email).Scan(&exists)
@@ -44,17 +44,34 @@ func (c *AuthCommands) Register(req dto.RegisterRequest) (*dto.TokenResponse, er
 		return nil, fmt.Errorf("şifre hashlenemedi: %w", err)
 	}
 
-	// Kullanıcıyı kaydet (varsayılan rol: viewer = 3)
+	// Rol belirle: admin ise gelen role_id'yi kullan, değilse viewer (3)
+	roleID := 3
+	if isAdmin && req.RoleID > 0 {
+		roleID = req.RoleID
+	}
+
+	// Kullanıcıyı kaydet
 	var userID string
 	err = c.db.QueryRow(
-		`INSERT INTO users (email, password_hash, full_name) VALUES ($1, $2, $3) RETURNING id`,
-		req.Email, string(hash), req.FullName,
+		`INSERT INTO users (email, password_hash, full_name, role_id) VALUES ($1, $2, $3, $4) RETURNING id`,
+		req.Email, string(hash), req.FullName, roleID,
 	).Scan(&userID)
 	if err != nil {
 		return nil, fmt.Errorf("kullanıcı kaydedilemedi: %w", err)
 	}
 
-	return c.generateTokenPair(userID, req.Email, "viewer", []string{"view_stats", "view_map"})
+	// Atanan rolün adını ve izinlerini DB'den çek
+	var roleName string
+	c.db.QueryRow(`SELECT name FROM roles WHERE id=$1`, roleID).Scan(&roleName)
+	if roleName == "" {
+		roleName = "viewer"
+	}
+	perms, err := c.getUserPermissions(userID)
+	if err != nil {
+		perms = []string{}
+	}
+
+	return c.generateTokenPair(userID, req.Email, roleName, perms)
 }
 
 func (c *AuthCommands) Login(req dto.LoginRequest) (*dto.TokenResponse, error) {
@@ -144,6 +161,42 @@ func (c *AuthCommands) AssignRole(targetUserID string, roleID int) error {
 		"UPDATE users SET role_id = $1, updated_at = NOW() WHERE id = $2",
 		roleID, targetUserID,
 	)
+	return err
+}
+
+// UpdateRolePermissions — bir rolün izin listesini tamamen değiştirir (transaction)
+func (c *AuthCommands) UpdateRolePermissions(roleID int, permissions []string) error {
+	tx, err := c.db.Begin()
+	if err != nil {
+		return fmt.Errorf("transaction başlatılamadı: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Mevcut izinleri sil
+	if _, err = tx.Exec(`DELETE FROM role_permissions WHERE role_id = $1`, roleID); err != nil {
+		return fmt.Errorf("eski izinler silinemedi: %w", err)
+	}
+
+	// Yeni izinleri ekle (name → id çevirisi)
+	for _, permName := range permissions {
+		var permID int
+		if err = tx.QueryRow(`SELECT id FROM permissions WHERE name = $1`, permName).Scan(&permID); err != nil {
+			return fmt.Errorf("izin bulunamadı '%s': %w", permName, err)
+		}
+		if _, err = tx.Exec(
+			`INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+			roleID, permID,
+		); err != nil {
+			return fmt.Errorf("izin eklenemedi '%s': %w", permName, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// DeleteUser — kullanıcıyı ve ilişkili refresh token'larını siler
+func (c *AuthCommands) DeleteUser(userID string) error {
+	_, err := c.db.Exec(`DELETE FROM users WHERE id = $1`, userID)
 	return err
 }
 

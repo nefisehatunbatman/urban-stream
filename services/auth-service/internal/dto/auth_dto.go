@@ -6,6 +6,9 @@ type RegisterRequest struct {
 	Email    string `json:"email"    validate:"required,email"`
 	Password string `json:"password" validate:"required,min=6"`
 	FullName string `json:"full_name"`
+	// RoleID opsiyoneldir; yalnızca admin token'ı ile çağrıldığında dikkate alınır.
+	// 0 veya belirtilmezse varsayılan viewer (id=3) atanır.
+	RoleID int `json:"role_id"`
 }
 
 type LoginRequest struct {
@@ -19,6 +22,11 @@ type RefreshRequest struct {
 
 type AssignRoleRequest struct {
 	RoleID int `json:"role_id" validate:"required"`
+}
+
+// UpdateRolePermissionsRequest — PUT /roles/:id gövdesi
+type UpdateRolePermissionsRequest struct {
+	Permissions []string `json:"permissions"` // İzin adları: ["manage_users","view_stats",...]
 }
 
 // --- Response ---

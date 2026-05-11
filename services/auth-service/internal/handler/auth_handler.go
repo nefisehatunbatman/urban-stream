@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"auth-service/internal/dto"
@@ -33,7 +34,13 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := h.commands.Register(req)
+	// İstek admin token'ıyla mı geldi? (opsiyonel header kontrolü)
+	isAdmin := false
+	if claims, ok := r.Context().Value(middleware.ClaimsKey).(*commands.Claims); ok && claims != nil {
+		isAdmin = claims.Role == "admin"
+	}
+
+	resp, err := h.commands.Register(req, isAdmin)
 	if err != nil {
 		pkg.Error(w, http.StatusBadRequest, err.Error())
 		return
@@ -124,4 +131,40 @@ func (h *AuthHandler) AssignRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pkg.JSON(w, http.StatusOK, map[string]string{"message": "rol güncellendi"})
+}
+
+// UpdateRolePermissions — PUT /roles/{id}
+func (h *AuthHandler) UpdateRolePermissions(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	var roleID int
+	if _, err := fmt.Sscanf(idStr, "%d", &roleID); err != nil || roleID == 0 {
+		pkg.Error(w, http.StatusBadRequest, "geçersiz rol id")
+		return
+	}
+
+	var req dto.UpdateRolePermissionsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		pkg.Error(w, http.StatusBadRequest, "geçersiz istek")
+		return
+	}
+
+	if err := h.commands.UpdateRolePermissions(roleID, req.Permissions); err != nil {
+		pkg.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	pkg.JSON(w, http.StatusOK, map[string]string{"message": "izinler güncellendi"})
+}
+
+// DeleteUser — DELETE /users/{id}
+func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	userID := chi.URLParam(r, "id")
+	if userID == "" {
+		pkg.Error(w, http.StatusBadRequest, "geçersiz kullanıcı id")
+		return
+	}
+	if err := h.commands.DeleteUser(userID); err != nil {
+		pkg.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	pkg.JSON(w, http.StatusOK, map[string]string{"message": "kullanıcı silindi"})
 }

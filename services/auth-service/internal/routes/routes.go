@@ -6,16 +6,16 @@ import (
 	"auth-service/internal/handler"
 	"auth-service/internal/middleware"
 	"auth-service/internal/service/commands"
+	"auth-service/internal/service/queries"
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 )
 
-func Setup(h *handler.AuthHandler, jwtService *commands.JWTService) *chi.Mux {
+func Setup(h *handler.AuthHandler, jwtService *commands.JWTService, q *queries.AuthQueries) *chi.Mux {
 	r := chi.NewRouter()
 
-	// Global middleware
 	r.Use(chiMiddleware.Logger)
 	r.Use(chiMiddleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
@@ -25,36 +25,38 @@ func Setup(h *handler.AuthHandler, jwtService *commands.JWTService) *chi.Mux {
 		AllowCredentials: false,
 	}))
 
-	// Health check
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Public routes
-	r.Post("/auth/register", h.Register)
+	// Public: login, refresh, logout
 	r.Post("/auth/login", h.Login)
 	r.Post("/auth/refresh", h.Refresh)
 	r.Post("/auth/logout", h.Logout)
 
-	// Protected routes
+	// Register: public erişim ama varsa token okunur (admin ise role_id dikkate alınır)
+	r.With(middleware.OptionalAuth(jwtService)).Post("/auth/register", h.Register)
+
+	// Authenticated routes
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(jwtService))
 
-		// Tüm giriş yapmış kullanıcılar
 		r.Get("/auth/me", h.Me)
 
-		// Sadece admin
+		// manage_users yetkisi gerekir
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.RequirePermission("manage_users"))
+			r.Use(middleware.RequirePermission(q, "manage_users"))
 			r.Get("/users", h.ListUsers)
 			r.Put("/users/{id}/role", h.AssignRole)
+			r.Delete("/users/{id}", h.DeleteUser)
 		})
 
-		// Admin veya operator
+		// assign_roles yetkisi gerekir
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.RequirePermission("assign_roles"))
+			r.Use(middleware.RequirePermission(q, "assign_roles"))
 			r.Get("/roles", h.ListRoles)
+			r.Put("/roles/{id}", h.UpdateRolePermissions)
 		})
 	})
 

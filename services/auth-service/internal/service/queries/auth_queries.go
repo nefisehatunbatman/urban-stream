@@ -30,7 +30,7 @@ func (q *AuthQueries) GetMe(userID string) (*dto.MeResponse, error) {
 		return nil, err
 	}
 
-	perms, err := q.getPermissions(userID)
+	perms, err := q.GetPermissions(userID) // ← değişti (küçük g → büyük G)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,8 @@ func (q *AuthQueries) ListRoles() ([]map[string]interface{}, error) {
 	return roles, nil
 }
 
-func (q *AuthQueries) getPermissions(userID string) ([]string, error) {
+// GetPermissions — kullanıcının güncel izinlerini DB'den çeker (export edildi)
+func (q *AuthQueries) GetPermissions(userID string) ([]string, error) {
 	rows, err := q.db.Query(`
 		SELECT p.name
 		FROM permissions p

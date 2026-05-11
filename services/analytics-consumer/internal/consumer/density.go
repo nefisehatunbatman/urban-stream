@@ -30,6 +30,7 @@ type Density struct {
 // ─── Batch Writer ─────────────────────────────────────────────────────────────
 // FIX: Tek tek INSERT yerine batch insert.
 // Her 500ms'de bir veya 500 kayıt dolunca flush yapar.
+//db kilitlenmesin diye cunku clickhouse her veri icin bir dosya olusturacakti
 
 const (
 	densityBatchSize  = 500

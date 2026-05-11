@@ -23,8 +23,8 @@ analyticsApi.interceptors.request.use((config) => {
 export const login = (email: string, password: string) =>
   api.post('/auth/login', { email, password })
 
-export const register = (email: string, password: string, full_name: string) =>
-  api.post('/auth/register', { email, password, full_name })
+export const register = (email: string, password: string, full_name: string, role_id?: number) =>
+  api.post('/auth/register', { email, password, full_name, ...(role_id ? { role_id } : {}) })
 
 export const refreshToken = (refresh_token: string) =>
   api.post('/auth/refresh', { refresh_token })
@@ -37,6 +37,10 @@ export const getMe = (token?: string) =>
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   })
 
+
+export const deleteUser = (userId: string) =>
+  api.delete(`/users/${userId}`)
+
 // Users
 export const listUsers = () => api.get('/users')
 export const getUsers = listUsers // alias
@@ -46,6 +50,9 @@ export const assignRole = (userId: string, roleId: number) =>
 
 // Roles
 export const listRoles = () => api.get('/roles')
+
+export const updateRolePermissions = (roleId: number, permissions: string[]) =>
+  api.put(`/roles/${roleId}`, { permissions })
 
 // Analytics (ClickHouse servisi)
 export const getDensity = (days = 30) =>
@@ -80,3 +87,4 @@ export const resumeStream = (channel?: string) =>
 
 export const streamStatus = () =>
   analyticsApi.get('/api/stream/status')
+
