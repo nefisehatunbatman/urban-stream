@@ -9,6 +9,9 @@ type RegisterRequest struct {
 	// RoleID opsiyoneldir; yalnızca admin token'ı ile çağrıldığında dikkate alınır.
 	// 0 veya belirtilmezse varsayılan viewer (id=3) atanır.
 	RoleID int `json:"role_id"`
+	// Permissions: admin tarafından kullanıcıya özel izin listesi.
+	// Dolu gelirse role_id'den bağımsız olarak user_permissions tablosuna kaydedilir.
+	Permissions []string `json:"permissions"`
 }
 
 type LoginRequest struct {
@@ -27,6 +30,12 @@ type AssignRoleRequest struct {
 // UpdateRolePermissionsRequest — PUT /roles/:id gövdesi
 type UpdateRolePermissionsRequest struct {
 	Permissions []string `json:"permissions"` // İzin adları: ["manage_users","view_stats",...]
+}
+
+// UpdateUserRequest — PUT /users/:id veya PUT /auth/me gövdesi
+type UpdateUserRequest struct {
+	FullName string `json:"full_name"`
+	Password string `json:"password"` // Boş ise şifre güncellenmez
 }
 
 // --- Response ---

@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { getUsers, assignRole, deleteUser, getMe } from '../api/endpoints'
 
+/* ─── Sabitler ─────────────────────────────────────────────────────────── */
+
 const ROLES = [
   {
     id: 1,
     name: 'admin',
     label: 'Admin',
     color: 'text-danger bg-danger/10',
+    dot: 'bg-danger',
     permissions: ['manage_users', 'assign_roles', 'create_report', 'view_stats', 'view_map'],
   },
   {
@@ -14,6 +17,7 @@ const ROLES = [
     name: 'operator',
     label: 'Operatör',
     color: 'text-warning bg-warning/10',
+    dot: 'bg-warning',
     permissions: ['create_report', 'view_stats', 'view_map'],
   },
   {
@@ -21,18 +25,35 @@ const ROLES = [
     name: 'viewer',
     label: 'Görüntüleyici',
     color: 'text-primary bg-primary/10',
+    dot: 'bg-primary',
     permissions: ['view_stats', 'view_map'],
   },
 ]
 
-// İzin adı → Turkce label
-const PERM_LABELS: Record<string, string> = {
-  manage_users: 'Kullanıcı Yönetimi',
-  assign_roles: 'Rol Atama',
-  create_report: 'Rapor Oluşturma',
-  view_stats: 'İstatistik',
-  view_map: 'Harita',
+// Tüm izinler — sıralı
+const ALL_PERMISSIONS: Record<string, { label: string; desc: string }> = {
+  manage_users:  { label: 'Kullanıcı Yönetimi',  desc: 'Kullanıcı oluşturma, silme ve düzenleme' },
+  assign_roles:  { label: 'Rol Atama',            desc: 'Kullanıcılara rol ve yetki atama' },
+  create_report: { label: 'Rapor Oluşturma',      desc: 'Analiz raporu oluşturma ve dışa aktarma' },
+  view_stats:    { label: 'İstatistik Görüntüle', desc: 'İstatistik panellerini ve grafikleri görme' },
+  view_map:      { label: 'Harita Görüntüle',     desc: 'Canlı ve geçmiş trafik haritasını görme' },
 }
+
+/* Seçili izin kümesine en iyi uyan rolü bul */
+function detectRole(selectedPerms: string[]): number {
+  const set = new Set(selectedPerms)
+  // Tam eşleşme önce
+  for (const r of ROLES) {
+    if (r.permissions.length === set.size && r.permissions.every((p) => set.has(p))) return r.id
+  }
+  // En yakın üst küme (en az izinli eşleşen)
+  for (const r of [...ROLES].sort((a, b) => a.permissions.length - b.permissions.length)) {
+    if (selectedPerms.every((p) => r.permissions.includes(p))) return r.id
+  }
+  return ROLES[0].id // admin — en kapsamlı
+}
+
+/* ─── Tipler ────────────────────────────────────────────────────────────── */
 
 interface User {
   id: string
@@ -50,11 +71,15 @@ interface CreateUserPayload {
   role_id: number
 }
 
-const INITIAL_FORM: CreateUserPayload = {
-  email: '',
-  password: '',
-  full_name: '',
-  role_id: 3,
+const INITIAL_FORM: CreateUserPayload = { email: '', password: '', full_name: '', role_id: 3 }
+
+function buildDraft(roleId: number): Record<string, boolean> {
+  const role = ROLES.find((r) => r.id === roleId)
+  const draft: Record<string, boolean> = {}
+  Object.keys(ALL_PERMISSIONS).forEach((p) => {
+    draft[p] = role?.permissions.includes(p) ?? false
+  })
+  return draft
 }
 
 function initials(name: string) {
@@ -72,17 +97,21 @@ function avatarColor(name: string) {
   return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length]
 }
 
+/* ─── Bileşen ───────────────────────────────────────────────────────────── */
+
 export default function UsersPage() {
-  const [users, setUsers]           = useState<User[]>([])
-  const [loading, setLoading]       = useState(true)
-  const [updating, setUpdating]     = useState<string | null>(null)
-  const [deleting, setDeleting]     = useState<string | null>(null)
-  const [search, setSearch]         = useState('')
-  const [roleFilter, setRoleFilter] = useState('')
-  const [showModal, setShowModal]   = useState(false)
-  const [form, setForm]             = useState<CreateUserPayload>(INITIAL_FORM)
-  const [formError, setFormError]   = useState('')
-  const [creating, setCreating]     = useState(false)
+  const [users, setUsers]             = useState<User[]>([])
+  const [loading, setLoading]         = useState(true)
+  const [updating, setUpdating]       = useState<string | null>(null)
+  const [deleting, setDeleting]       = useState<string | null>(null)
+  const [search, setSearch]           = useState('')
+  const [roleFilter, setRoleFilter]   = useState('')
+  const [showModal, setShowModal]     = useState(false)
+  const [form, setForm]               = useState<CreateUserPayload>(INITIAL_FORM)
+  const [draftPerms, setDraftPerms]   = useState<Record<string, boolean>>(buildDraft(3))
+  const [formError, setFormError]     = useState('')
+  const [creating, setCreating]       = useState(false)
+
   const [currentRole, setCurrentRole] = useState<string>('')
 
   useEffect(() => {
@@ -94,9 +123,7 @@ export default function UsersPage() {
     try {
       const res = await getMe()
       setCurrentRole(res.data?.data?.role || res.data?.role || '')
-    } catch (e) {
-      console.error(e)
-    }
+    } catch (e) { console.error(e) }
   }
 
   const isAdmin = currentRole === 'admin'
@@ -105,11 +132,27 @@ export default function UsersPage() {
     try {
       const res = await getUsers()
       setUsers(res.data.data || [])
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setLoading(false)
-    }
+    } catch (e) { console.error(e) }
+    finally { setLoading(false) }
+  }
+
+  /* Modal aç — formu ve izinleri sıfırla */
+  const openModal = () => {
+    setForm(INITIAL_FORM)
+    setDraftPerms(buildDraft(3))
+    setFormError('')
+    setShowModal(true)
+  }
+
+  /* Rol şablonu seçince izinleri güncelle */
+  const handleRoleSelect = (roleId: number) => {
+    setForm((f) => ({ ...f, role_id: roleId }))
+    setDraftPerms(buildDraft(roleId))
+  }
+
+  /* İzin toggle edilince rol şablonunu değiştirme, sadece izni güncelle */
+  const togglePerm = (perm: string) => {
+    setDraftPerms((prev) => ({ ...prev, [perm]: !prev[perm] }))
   }
 
   const handleRoleChange = async (userId: string, roleId: number) => {
@@ -118,11 +161,8 @@ export default function UsersPage() {
     try {
       await assignRole(userId, roleId)
       await fetchUsers()
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setUpdating(null)
-    }
+    } catch (e) { console.error(e) }
+    finally { setUpdating(null) }
   }
 
   const handleDelete = async (userId: string) => {
@@ -132,11 +172,8 @@ export default function UsersPage() {
     try {
       await deleteUser(userId)
       await fetchUsers()
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setDeleting(null)
-    }
+    } catch (e) { console.error(e) }
+    finally { setDeleting(null) }
   }
 
   const handleCreate = async () => {
@@ -148,15 +185,25 @@ export default function UsersPage() {
     setCreating(true)
     try {
       const { register } = await import('../api/endpoints')
-      // Backend: admin token'ıyla çağrıldığında role_id dikkate alınır
-      const res = await register(form.email, form.password, form.full_name, form.role_id)
+      // Sadece seçili olan izinleri dizi haline getir
+      const selectedPerms = Object.entries(draftPerms)
+        .filter(([, isSelected]) => isSelected)
+        .map(([permName]) => permName)
+
+      // register fonksiyonuna permissions dizisini de ekliyoruz
+      const res = await register(
+        form.email, 
+        form.password, 
+        form.full_name, 
+        form.role_id, 
+        selectedPerms
+      )
+      
       const newUserId: string = res.data?.data?.id || res.data?.id
-      // Backend role_id'yi doğrudan işleyemezse yedek olarak assignRole
       if (newUserId && form.role_id !== 3) {
-        try { await assignRole(newUserId, form.role_id) } catch { /* yedek zaten çalışmıştır */ }
+        try { await assignRole(newUserId, form.role_id) } catch { /* yedek */ }
       }
       setShowModal(false)
-      setForm(INITIAL_FORM)
       await fetchUsers()
     } catch (e: any) {
       setFormError(e?.response?.data?.message || 'Kullanıcı oluşturulamadı.')
@@ -170,8 +217,7 @@ export default function UsersPage() {
 
   const filtered = users.filter((u) => {
     const q = search.toLowerCase()
-    const matchSearch =
-      u.full_name?.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+    const matchSearch = u.full_name?.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
     const matchRole = roleFilter ? u.role === roleFilter : true
     return matchSearch && matchRole
   })
@@ -181,6 +227,9 @@ export default function UsersPage() {
     active: users.filter((u) => u.is_active).length,
     admins: users.filter((u) => u.role === 'admin').length,
   }
+
+  const selectedPermsCount = Object.values(draftPerms).filter(Boolean).length
+  const matchedRole = ROLES.find((r) => r.id === form.role_id)
 
   if (loading) {
     return (
@@ -193,6 +242,7 @@ export default function UsersPage() {
 
   return (
     <div className="p-6 space-y-6 bg-black min-h-screen">
+
       {/* Başlık */}
       <div>
         <h1 className="text-2xl font-bold text-white">Kullanıcı Yönetimi</h1>
@@ -235,9 +285,8 @@ export default function UsersPage() {
           ))}
         </select>
 
-        {/* Yeni Kullanıcı butonu — yetkisizse silik */}
         <button
-          onClick={() => { if (isAdmin) { setShowModal(true); setFormError('') } }}
+          onClick={() => { if (isAdmin) openModal() }}
           disabled={!isAdmin}
           title={!isAdmin ? 'Bu işlem için admin yetkisi gereklidir' : ''}
           className={`ml-auto text-sm font-semibold px-4 py-2 rounded-lg transition-colors
@@ -276,7 +325,6 @@ export default function UsersPage() {
                   key={user.id}
                   className="border-b border-primary/10 hover:bg-[#0a0a0a] transition-all duration-150"
                 >
-                  {/* Kullanıcı */}
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${avatarColor(user.full_name || user.email)}`}>
@@ -289,26 +337,22 @@ export default function UsersPage() {
                     </div>
                   </td>
 
-                  {/* Rol Rozeti */}
                   <td className="px-5 py-4">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${getRoleStyle(user.role)}`}>
                       {ROLES.find((r) => r.name === user.role)?.label || user.role}
                     </span>
                   </td>
 
-                  {/* Durum */}
                   <td className="px-5 py-4">
                     <span className={`px-2 py-1 rounded text-xs ${user.is_active ? 'text-primary bg-primary/10' : 'text-danger bg-danger/10'}`}>
                       {user.is_active ? 'Aktif' : 'Pasif'}
                     </span>
                   </td>
 
-                  {/* Tarih */}
                   <td className="px-5 py-4 text-slate-400 text-xs">
                     {user.created_at?.slice(0, 10)}
                   </td>
 
-                  {/* Rol Select — yetkisizse silik */}
                   <td className="px-5 py-4">
                     <select
                       disabled={!isAdmin || updating === user.id}
@@ -327,7 +371,6 @@ export default function UsersPage() {
                     </select>
                   </td>
 
-                  {/* Sil Butonu — yetkisizse silik */}
                   <td className="px-5 py-4">
                     <button
                       onClick={() => handleDelete(user.id)}
@@ -349,71 +392,163 @@ export default function UsersPage() {
         </table>
       </div>
 
-      {/* Modal — aynı kalıyor, sadece admin açabilir */}
+      {/* ─── Yeni Kullanıcı Modal ─────────────────────────────────────────── */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#050505] border border-primary/30 rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <h2 className="text-white text-lg font-semibold mb-5">Yeni Kullanıcı Oluştur</h2>
-            <div className="space-y-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-[#050505] border border-primary/30 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+
+            {/* Modal Başlık */}
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-primary/10">
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">Ad Soyad</label>
-                <input type="text" placeholder="Ahmet Yılmaz" value={form.full_name}
+                <h2 className="text-white text-lg font-semibold">Yeni Kullanıcı Oluştur</h2>
+                <p className="text-slate-500 text-xs mt-0.5">Bilgileri doldurun ve izinleri belirleyin</p>
+              </div>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-slate-500 hover:text-white text-xl leading-none transition-colors"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal İçerik — kaydırılabilir */}
+            <div className="overflow-y-auto px-6 py-5 space-y-5 flex-1">
+
+              {/* Ad Soyad */}
+              <div>
+                <label className="text-xs text-slate-400 mb-1.5 block">Ad Soyad</label>
+                <input
+                  type="text"
+                  placeholder="Ahmet Yılmaz"
+                  value={form.full_name}
                   onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                  className="w-full bg-[#0a0a0a] border border-primary/20 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-primary placeholder:text-slate-600" />
+                  className="w-full bg-[#0d0d0d] border border-primary/20 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary placeholder:text-slate-600 transition-colors"
+                />
               </div>
+
+              {/* E-posta */}
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">E-posta</label>
-                <input type="email" placeholder="ornek@sirket.com" value={form.email}
+                <label className="text-xs text-slate-400 mb-1.5 block">E-posta</label>
+                <input
+                  type="email"
+                  placeholder="ornek@sirket.com"
+                  value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full bg-[#0a0a0a] border border-primary/20 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-primary placeholder:text-slate-600" />
+                  className="w-full bg-[#0d0d0d] border border-primary/20 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary placeholder:text-slate-600 transition-colors"
+                />
               </div>
+
+              {/* Şifre */}
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">Şifre</label>
-                <input type="password" placeholder="••••••••" value={form.password}
+                <label className="text-xs text-slate-400 mb-1.5 block">Şifre</label>
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full bg-[#0a0a0a] border border-primary/20 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-primary placeholder:text-slate-600" />
+                  className="w-full bg-[#0d0d0d] border border-primary/20 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary placeholder:text-slate-600 transition-colors"
+                />
               </div>
+
+              {/* Hızlı Rol Şablonu */}
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">Rol</label>
-                <select value={form.role_id} onChange={(e) => setForm({ ...form, role_id: Number(e.target.value) })}
-                  className="w-full bg-[#0a0a0a] border border-primary/20 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-primary">
-                  {ROLES.map((r) => (
-                    <option key={r.id} value={r.id}>{r.label}</option>
-                  ))}
-                </select>
-                {/* Seçilen rolün izinleri */}
-                {(() => {
-                  const selectedRole = ROLES.find((r) => r.id === form.role_id)
-                  if (!selectedRole) return null
-                  return (
-                    <div className="mt-2">
-                      <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Bu rolün izinleri</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {selectedRole.permissions.map((p) => (
-                          <span
-                            key={p}
-                            className="text-[11px] px-2 py-0.5 rounded bg-[#0a0a0a] border border-primary/20 text-slate-300"
-                          >
-                            {PERM_LABELS[p] || p}
-                          </span>
-                        ))}
+                <label className="text-xs text-slate-400 mb-2 block">Rol Şablonu</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {ROLES.map((r) => {
+                    const isActive = form.role_id === r.id
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => handleRoleSelect(r.id)}
+                        className={`flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl border text-xs font-medium transition-all duration-150
+                          ${isActive
+                            ? 'border-primary/50 bg-primary/10 text-white shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.15)]'
+                            : 'border-slate-700/50 bg-[#0d0d0d] text-slate-400 hover:border-slate-600 hover:text-slate-300'
+                          }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${r.dot}`} />
+                        <span>{r.label}</span>
+                        <span className="text-[10px] text-slate-500 font-normal">{r.permissions.length} yetki</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Yetki Seçimi */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-slate-400">Yetkiler</label>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${matchedRole?.color || 'text-slate-400 bg-slate-700/40'}`}>
+                      {matchedRole?.label}
+                    </span>
+                    <span className="text-[10px] text-slate-600">
+                      {selectedPermsCount}/{Object.keys(ALL_PERMISSIONS).length} seçili
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-primary/15 overflow-hidden">
+                  {Object.entries(ALL_PERMISSIONS).map(([perm, info], idx, arr) => (
+                    <div
+                      key={perm}
+                      onClick={() => togglePerm(perm)}
+                      className={`flex items-center justify-between px-4 py-3.5 cursor-pointer select-none transition-colors duration-150
+                        hover:bg-white/[0.025]
+                        ${idx < arr.length - 1 ? 'border-b border-white/[0.05]' : ''}
+                        ${draftPerms[perm] ? 'bg-primary/5' : 'bg-[#0a0a0a]'}
+                      `}
+                    >
+                      {/* İzin adı + açıklama */}
+                      <div className="flex-1 min-w-0 pr-4">
+                        <p className={`text-sm font-medium transition-colors duration-150 ${draftPerms[perm] ? 'text-white' : 'text-slate-400'}`}>
+                          {info.label}
+                        </p>
+                        <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">{info.desc}</p>
+                      </div>
+
+                      {/* Toggle Switch */}
+                      <div
+                        role="switch"
+                        aria-checked={draftPerms[perm]}
+                        onClick={(e) => { e.stopPropagation(); togglePerm(perm) }}
+                        className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 cursor-pointer
+                          ${draftPerms[perm] ? 'bg-primary' : 'bg-slate-700'}`}
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200
+                            ${draftPerms[perm] ? 'translate-x-5' : 'translate-x-0'}`}
+                        />
                       </div>
                     </div>
-                  )
-                })()}
+                  ))}
+                </div>
               </div>
+
+              {formError && (
+                <p className="text-danger text-xs">{formError}</p>
+              )}
             </div>
-            {formError && <p className="text-danger text-xs mt-3">{formError}</p>}
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => { setShowModal(false); setForm(INITIAL_FORM) }}
-                className="flex-1 bg-[#0a0a0a] border border-primary/20 text-slate-300 text-sm font-medium px-4 py-2 rounded-lg hover:border-primary/40 transition-colors">
+
+            {/* Modal Alt Butonlar */}
+            <div className="flex gap-3 px-6 py-4 border-t border-primary/10">
+              <button
+                onClick={() => setShowModal(false)}
+                className="flex-1 bg-[#0d0d0d] border border-primary/20 text-slate-300 text-sm font-medium px-4 py-2.5 rounded-lg hover:border-primary/40 transition-colors"
+              >
                 İptal
               </button>
-              <button onClick={handleCreate} disabled={creating}
-                className="flex-1 bg-primary text-black text-sm font-semibold px-4 py-2 rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors">
-                {creating ? 'Oluşturuluyor...' : 'Oluştur'}
+              <button
+                onClick={handleCreate}
+                disabled={creating}
+                className="flex-1 bg-primary text-black text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                {creating ? 'Oluşturuluyor...' : 'Kullanıcı Oluştur'}
               </button>
             </div>
+
           </div>
         </div>
       )}

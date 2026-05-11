@@ -55,12 +55,20 @@ export default function Sidebar() {
           <p className="text-sm text-white font-medium truncate">{user?.full_name || user?.email}</p>
           <p className="text-xs text-slate-400 capitalize">{user?.role}</p>
         </div>
-        <button
-          onClick={handleLogout}
-          className="w-full mt-2 px-4 py-2 text-sm text-slate-400 hover:text-danger hover:bg-dark-700 rounded-md transition-all duration-150 text-left"
-        >
-          Çıkış Yap
-        </button>
+        <div className="flex gap-2 mt-2">
+          <button
+            onClick={() => navigate('/account')}
+            className="flex-1 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-dark-700 rounded-md transition-all duration-150 text-center border border-dark-600 hover:border-slate-600"
+          >
+            Hesabım
+          </button>
+          <button
+            onClick={handleLogout}
+            className="flex-1 px-3 py-2 text-sm text-danger hover:bg-danger/10 rounded-md transition-all duration-150 text-center border border-dark-600 hover:border-danger/30"
+          >
+            Çıkış
+          </button>
+        </div>
       </div>
     </aside>
   )

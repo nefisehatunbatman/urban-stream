@@ -43,11 +43,13 @@ func Setup(h *handler.AuthHandler, jwtService *commands.JWTService, q *queries.A
 		r.Use(middleware.Auth(jwtService))
 
 		r.Get("/auth/me", h.Me)
+		r.Put("/auth/me", h.UpdateMe)
 
 		// manage_users yetkisi gerekir
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequirePermission(q, "manage_users"))
 			r.Get("/users", h.ListUsers)
+			r.Put("/users/{id}", h.UpdateUser)
 			r.Put("/users/{id}/role", h.AssignRole)
 			r.Delete("/users/{id}", h.DeleteUser)
 		})

@@ -50,6 +50,14 @@ func RunMigrations(db *sql.DB) {
 			created_at TIMESTAMP DEFAULT NOW()
 		)`,
 
+		// Kullanıcıya özel izinler (rol bağımsız override)
+		// Eğer bu tabloda kayıt varsa, rol izinleri yerine bunlar kullanılır.
+		`CREATE TABLE IF NOT EXISTS user_permissions (
+			user_id       UUID REFERENCES users(id) ON DELETE CASCADE,
+			permission_id INT  REFERENCES permissions(id) ON DELETE CASCADE,
+			PRIMARY KEY (user_id, permission_id)
+		)`,
+
 		// Varsayılan roller
 		`INSERT INTO roles (name) VALUES ('admin'), ('operator'), ('viewer')
 		 ON CONFLICT (name) DO NOTHING`,

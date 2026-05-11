@@ -60,7 +60,15 @@ func (c *AuthCommands) Register(req dto.RegisterRequest, isAdmin bool) (*dto.Tok
 		return nil, fmt.Errorf("kullanıcı kaydedilemedi: %w", err)
 	}
 
-	// Atanan rolün adını ve izinlerini DB'den çek
+	// Admin özel izin listesi gönderdiyse user_permissions'a kaydet
+	if isAdmin && len(req.Permissions) > 0 {
+		if err = c.saveUserPermissions(userID, req.Permissions); err != nil {
+			// Kayıt başarısız olsa bile devam et, rol izinlerine düşer
+			fmt.Printf("[warn] user_permissions kaydedilemedi: %v\n", err)
+		}
+	}
+
+	// Atanan rolün adını DB'den çek
 	var roleName string
 	c.db.QueryRow(`SELECT name FROM roles WHERE id=$1`, roleID).Scan(&roleName)
 	if roleName == "" {
@@ -194,6 +202,21 @@ func (c *AuthCommands) UpdateRolePermissions(roleID int, permissions []string) e
 	return tx.Commit()
 }
 
+// UpdateUser — Kullanıcı adını ve şifresini günceller (şifre boş değilse)
+func (c *AuthCommands) UpdateUser(userID string, fullName, password string) error {
+	if password != "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return fmt.Errorf("şifre hashlenemedi: %w", err)
+		}
+		_, err = c.db.Exec(`UPDATE users SET full_name = $1, password_hash = $2, updated_at = NOW() WHERE id = $3`, fullName, string(hash), userID)
+		return err
+	}
+	
+	_, err := c.db.Exec(`UPDATE users SET full_name = $1, updated_at = NOW() WHERE id = $2`, fullName, userID)
+	return err
+}
+
 // DeleteUser — kullanıcıyı ve ilişkili refresh token'larını siler
 func (c *AuthCommands) DeleteUser(userID string) error {
 	_, err := c.db.Exec(`DELETE FROM users WHERE id = $1`, userID)
@@ -227,26 +250,84 @@ func (c *AuthCommands) generateTokenPair(userID, email, role string, permissions
 	}, nil
 }
 
+// getUserPermissions — önce user_permissions bakar; kayıt varsa onu döndürür,
+// yoksa role_permissions'a fallback yapar.
 func (c *AuthCommands) getUserPermissions(userID string) ([]string, error) {
-	rows, err := c.db.Query(`
+	// 1) Kullanıcıya özel izinler
+	userRows, err := c.db.Query(`
+		SELECT p.name
+		FROM permissions p
+		JOIN user_permissions up ON up.permission_id = p.id
+		WHERE up.user_id = $1
+		ORDER BY p.name
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer userRows.Close()
+
+	var perms []string
+	for userRows.Next() {
+		var p string
+		userRows.Scan(&p)
+		perms = append(perms, p)
+	}
+
+	// Kullanıcıya özel izin varsa — rol izinlerini atla
+	if len(perms) > 0 {
+		return perms, nil
+	}
+
+	// 2) Fallback: rol üzerinden izinler
+	roleRows, err := c.db.Query(`
 		SELECT p.name
 		FROM permissions p
 		JOIN role_permissions rp ON rp.permission_id = p.id
 		JOIN users u ON u.role_id = rp.role_id
 		WHERE u.id = $1
+		ORDER BY p.name
 	`, userID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer roleRows.Close()
 
-	var perms []string
-	for rows.Next() {
+	for roleRows.Next() {
 		var p string
-		rows.Scan(&p)
+		roleRows.Scan(&p)
 		perms = append(perms, p)
 	}
 	return perms, nil
+}
+
+// saveUserPermissions — user_permissions tablosuna transaction ile yazar (mevcut kayıtları temizler)
+func (c *AuthCommands) saveUserPermissions(userID string, permissions []string) error {
+	tx, err := c.db.Begin()
+	if err != nil {
+		return fmt.Errorf("transaction başlatılamadı: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Eskilerini temizle
+	if _, err = tx.Exec(`DELETE FROM user_permissions WHERE user_id = $1`, userID); err != nil {
+		return fmt.Errorf("eski kullanıcı izinleri silinemedi: %w", err)
+	}
+
+	// Yenilerini ekle
+	for _, permName := range permissions {
+		var permID int
+		if err = tx.QueryRow(`SELECT id FROM permissions WHERE name = $1`, permName).Scan(&permID); err != nil {
+			return fmt.Errorf("izin bulunamadı '%s': %w", permName, err)
+		}
+		if _, err = tx.Exec(
+			`INSERT INTO user_permissions (user_id, permission_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+			userID, permID,
+		); err != nil {
+			return fmt.Errorf("izin eklenemedi '%s': %w", permName, err)
+		}
+	}
+
+	return tx.Commit()
 }
 
 func hashToken(token string) string {

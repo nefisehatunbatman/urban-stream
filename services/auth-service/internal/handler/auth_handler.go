@@ -168,3 +168,38 @@ func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 	pkg.JSON(w, http.StatusOK, map[string]string{"message": "kullanıcı silindi"})
 }
+
+// UpdateUser — PUT /users/{id}
+func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	userID := chi.URLParam(r, "id")
+	if userID == "" {
+		pkg.Error(w, http.StatusBadRequest, "geçersiz kullanıcı id")
+		return
+	}
+	var req dto.UpdateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		pkg.Error(w, http.StatusBadRequest, "geçersiz istek")
+		return
+	}
+	if err := h.commands.UpdateUser(userID, req.FullName, req.Password); err != nil {
+		pkg.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	pkg.JSON(w, http.StatusOK, map[string]string{"message": "kullanıcı güncellendi"})
+}
+
+// UpdateMe — PUT /auth/me
+func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	claims := r.Context().Value(middleware.ClaimsKey).(*commands.Claims)
+	
+	var req dto.UpdateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		pkg.Error(w, http.StatusBadRequest, "geçersiz istek")
+		return
+	}
+	if err := h.commands.UpdateUser(claims.UserID, req.FullName, req.Password); err != nil {
+		pkg.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	pkg.JSON(w, http.StatusOK, map[string]string{"message": "profil güncellendi"})
+}

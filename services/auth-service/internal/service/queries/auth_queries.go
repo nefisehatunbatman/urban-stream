@@ -90,24 +90,51 @@ func (q *AuthQueries) ListRoles() ([]map[string]interface{}, error) {
 	return roles, nil
 }
 
-// GetPermissions — kullanıcının güncel izinlerini DB'den çeker (export edildi)
+// GetPermissions — önce user_permissions bakar; kayıt varsa onu döndürür,
+// yoksa role_permissions'a fallback yapar. (Export edildi — middleware tarafından kullanılır)
 func (q *AuthQueries) GetPermissions(userID string) ([]string, error) {
-	rows, err := q.db.Query(`
+	// 1) Kullanıcıya özel izinler
+	userRows, err := q.db.Query(`
+		SELECT p.name
+		FROM permissions p
+		JOIN user_permissions up ON up.permission_id = p.id
+		WHERE up.user_id = $1
+		ORDER BY p.name
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer userRows.Close()
+
+	var perms []string
+	for userRows.Next() {
+		var p string
+		userRows.Scan(&p)
+		perms = append(perms, p)
+	}
+
+	// Kullanıcıya özel izin varsa — rol izinlerini atla
+	if len(perms) > 0 {
+		return perms, nil
+	}
+
+	// 2) Fallback: rol üzerinden izinler
+	roleRows, err := q.db.Query(`
 		SELECT p.name
 		FROM permissions p
 		JOIN role_permissions rp ON rp.permission_id = p.id
 		JOIN users u ON u.role_id = rp.role_id
 		WHERE u.id = $1
+		ORDER BY p.name
 	`, userID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer roleRows.Close()
 
-	var perms []string
-	for rows.Next() {
+	for roleRows.Next() {
 		var p string
-		rows.Scan(&p)
+		roleRows.Scan(&p)
 		perms = append(perms, p)
 	}
 	return perms, nil

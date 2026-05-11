@@ -23,8 +23,20 @@ analyticsApi.interceptors.request.use((config) => {
 export const login = (email: string, password: string) =>
   api.post('/auth/login', { email, password })
 
-export const register = (email: string, password: string, full_name: string, role_id?: number) =>
-  api.post('/auth/register', { email, password, full_name, ...(role_id ? { role_id } : {}) })
+export const register = (
+  email: string,
+  password: string,
+  full_name: string,
+  role_id?: number,
+  permissions?: string[],
+) =>
+  api.post('/auth/register', {
+    email,
+    password,
+    full_name,
+    ...(role_id     ? { role_id }     : {}),
+    ...(permissions ? { permissions } : {}),
+  })
 
 export const refreshToken = (refresh_token: string) =>
   api.post('/auth/refresh', { refresh_token })
@@ -37,7 +49,8 @@ export const getMe = (token?: string) =>
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   })
 
-
+export const updateMe = (full_name: string, password?: string) =>
+  api.put('/auth/me', { full_name, ...(password ? { password } : {}) })
 export const deleteUser = (userId: string) =>
   api.delete(`/users/${userId}`)
 
@@ -47,6 +60,9 @@ export const getUsers = listUsers // alias
 
 export const assignRole = (userId: string, roleId: number) =>
   api.put(`/users/${userId}/role`, { role_id: roleId })
+
+export const updateUser = (userId: string, full_name: string, password?: string) =>
+  api.put(`/users/${userId}`, { full_name, ...(password ? { password } : {}) })
 
 // Roles
 export const listRoles = () => api.get('/roles')
