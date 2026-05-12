@@ -77,4 +77,3 @@ Projenin `/services` dizini altında 8 adet bağımsız servis bulunmaktadır. H
 *   **Event-Driven Architecture:** Mikroservislerin birbirini beklemeden Kafka üzerinden haberleşmesi. Yüksek erişilebilirlik (High Availability) sağlar.
 *   **OLAP Veritabanı Kullanımı:** Geleneksel SQL (Postgres) yerine, büyük veriyi saniyeler içinde analiz etmek için Sütun-Tabanlı (Columnar) ClickHouse kullanılması.
 
-Bu doküman, projeye yeni dahil olan bir geliştiricinin sistemin tam olarak nasıl çalıştığını anlaması için temel rehber niteliğindedir.
