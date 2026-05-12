@@ -66,7 +66,9 @@ export function useMqtt(topics: string[]) {
         clientRef.current = null
       }
 
-      const client = mqtt.connect('ws://localhost:8083/mqtt', {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const mqttHost = import.meta.env.PROD ? window.location.hostname : 'localhost'
+      const client = mqtt.connect(`${protocol}//${mqttHost}:8083/mqtt`, {
        // username:                 ,
        // password:        '',
         clientId:        `urban_${Math.random().toString(16).slice(2, 8)}`,

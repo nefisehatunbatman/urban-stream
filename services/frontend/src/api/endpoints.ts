@@ -1,7 +1,7 @@
 import axios from 'axios'
 
-const AUTH_BASE = import.meta.env.VITE_AUTH_URL || 'http://localhost:8081'
-const ANALYTICS_BASE = import.meta.env.VITE_ANALYTICS_URL || 'http://localhost:8082'
+const AUTH_BASE = import.meta.env.VITE_AUTH_URL || (import.meta.env.PROD ? '' : 'http://localhost:8081')
+const ANALYTICS_BASE = import.meta.env.VITE_ANALYTICS_URL || (import.meta.env.PROD ? '' : 'http://localhost:8082')
 
 const api = axios.create({ baseURL: AUTH_BASE })
 const analyticsApi = axios.create({ baseURL: ANALYTICS_BASE })
