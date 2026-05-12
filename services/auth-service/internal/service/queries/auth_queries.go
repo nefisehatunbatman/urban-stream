@@ -18,11 +18,11 @@ func NewAuthQueries(db *sql.DB) *AuthQueries {
 func (q *AuthQueries) GetMe(userID string) (*dto.MeResponse, error) {
 	var me dto.MeResponse
 	err := q.db.QueryRow(`
-		SELECT u.id, u.email, COALESCE(u.full_name, ''), r.name
+		SELECT u.id, u.email, COALESCE(u.full_name, ''), r.name, u.role_id
 		FROM users u
 		JOIN roles r ON r.id = u.role_id
 		WHERE u.id = $1 AND u.is_active = TRUE
-	`, userID).Scan(&me.ID, &me.Email, &me.FullName, &me.Role)
+	`, userID).Scan(&me.ID, &me.Email, &me.FullName, &me.Role, &me.RoleID)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("kullanıcı bulunamadı")
 	}
@@ -30,7 +30,7 @@ func (q *AuthQueries) GetMe(userID string) (*dto.MeResponse, error) {
 		return nil, err
 	}
 
-	perms, err := q.GetPermissions(userID) // ← değişti (küçük g → büyük G)
+	perms, err := q.GetPermissions(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (q *AuthQueries) GetMe(userID string) (*dto.MeResponse, error) {
 
 func (q *AuthQueries) ListUsers() ([]dto.UserResponse, error) {
 	rows, err := q.db.Query(`
-		SELECT u.id, u.email, COALESCE(u.full_name, ''), r.name, u.is_active,
+		SELECT u.id, u.email, COALESCE(u.full_name, ''), r.name, u.role_id, u.is_active,
 		       TO_CHAR(u.created_at, 'YYYY-MM-DD HH24:MI:SS')
 		FROM users u
 		JOIN roles r ON r.id = u.role_id
@@ -54,7 +54,7 @@ func (q *AuthQueries) ListUsers() ([]dto.UserResponse, error) {
 	var users []dto.UserResponse
 	for rows.Next() {
 		var u dto.UserResponse
-		rows.Scan(&u.ID, &u.Email, &u.FullName, &u.Role, &u.IsActive, &u.CreatedAt)
+		rows.Scan(&u.ID, &u.Email, &u.FullName, &u.Role, &u.RoleID, &u.IsActive, &u.CreatedAt)
 		users = append(users, u)
 	}
 	return users, nil

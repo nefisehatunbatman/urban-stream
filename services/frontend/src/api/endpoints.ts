@@ -64,8 +64,17 @@ export const assignRole = (userId: string, roleId: number) =>
 export const updateUser = (userId: string, full_name: string, password?: string) =>
   api.put(`/users/${userId}`, { full_name, ...(password ? { password } : {}) })
 
+export const getUserPermissions = (userId: string) =>
+  api.get(`/users/${userId}/permissions`)
+
+export const updateUserPermissions = (userId: string, permissions: string[]) =>
+  api.put(`/users/${userId}/permissions`, { permissions })
+
 // Roles
 export const listRoles = () => api.get('/roles')
+
+export const createRole = (name: string, permissions: string[]) =>
+  api.post('/roles', { name, permissions })
 
 export const updateRolePermissions = (roleId: number, permissions: string[]) =>
   api.put(`/roles/${roleId}`, { permissions })

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getUsers, assignRole, deleteUser, getMe } from '../api/endpoints'
+import { getUsers, assignRole, deleteUser, getMe, getUserPermissions, updateUserPermissions } from '../api/endpoints'
 
 /* ─── Sabitler ─────────────────────────────────────────────────────────── */
 
@@ -112,7 +112,15 @@ export default function UsersPage() {
   const [formError, setFormError]     = useState('')
   const [creating, setCreating]       = useState(false)
 
-  const [currentRole, setCurrentRole] = useState<string>('')
+  // Özel İzin Modal State'leri
+  const [isPermModalOpen, setIsPermModalOpen] = useState(false)
+  const [permUser, setPermUser]               = useState<User | null>(null)
+  const [userPerms, setUserPerms]             = useState<Record<string, boolean>>({})
+  const [permLoading, setPermLoading]         = useState(false)
+  const [permSaving, setPermSaving]           = useState(false)
+  const [permError, setPermError]             = useState('')
+
+  const [currentRoleID, setCurrentRoleID] = useState<number>(3)
 
   useEffect(() => {
     fetchUsers()
@@ -122,11 +130,19 @@ export default function UsersPage() {
   const fetchCurrentUser = async () => {
     try {
       const res = await getMe()
-      setCurrentRole(res.data?.data?.role || res.data?.role || '')
+      // Backend'den role_id bekle, yoksa geriye dönük uyumluluk için isimden bul
+      let roleId = res.data?.data?.role_id || res.data?.role_id
+      if (!roleId) {
+        const roleName = res.data?.data?.role || res.data?.role || ''
+        if (roleName === 'admin') roleId = 1
+        else if (roleName === 'operator') roleId = 2
+        else roleId = 3
+      }
+      setCurrentRoleID(roleId)
     } catch (e) { console.error(e) }
   }
 
-  const isAdmin = currentRole === 'admin'
+  const isAdmin = currentRoleID === 1
 
   const fetchUsers = async () => {
     try {
@@ -209,6 +225,48 @@ export default function UsersPage() {
       setFormError(e?.response?.data?.message || 'Kullanıcı oluşturulamadı.')
     } finally {
       setCreating(false)
+    }
+  }
+
+  // --- Özel İzin Düzenleme Fonksiyonları ---
+  const openPermModal = async (user: User) => {
+    if (!isAdmin) return
+    setPermUser(user)
+    setIsPermModalOpen(true)
+    setPermLoading(true)
+    setPermError('')
+    
+    try {
+      const res = await getUserPermissions(user.id)
+      const currentPerms = res.data?.permissions || []
+      const draft: Record<string, boolean> = {}
+      Object.keys(ALL_PERMISSIONS).forEach((p) => { draft[p] = currentPerms.includes(p) })
+      setUserPerms(draft)
+    } catch (err: any) {
+      setPermError('Yetkiler yüklenemedi.')
+    } finally {
+      setPermLoading(false)
+    }
+  }
+
+  const toggleUserPerm = (perm: string) => {
+    setUserPerms((prev) => ({ ...prev, [perm]: !prev[perm] }))
+  }
+
+  const handlePermSave = async () => {
+    if (!permUser) return
+    setPermSaving(true)
+    setPermError('')
+    const newPerms = Object.entries(userPerms).filter(([, v]) => v).map(([k]) => k)
+    
+    try {
+      await updateUserPermissions(permUser.id, newPerms)
+      setIsPermModalOpen(false)
+      // fetchUsers yapmaya gerek yok, çünkü users tablosunda listelemiyoruz
+    } catch (e: any) {
+      setPermError(e?.response?.data?.message || 'Yetkiler kaydedilemedi.')
+    } finally {
+      setPermSaving(false)
     }
   }
 
@@ -309,7 +367,7 @@ export default function UsersPage() {
               <th className="text-left px-5 py-3 text-xs text-slate-400 font-medium">Durum</th>
               <th className="text-left px-5 py-3 text-xs text-slate-400 font-medium">Kayıt Tarihi</th>
               <th className="text-left px-5 py-3 text-xs text-slate-400 font-medium">Rol Değiştir</th>
-              <th className="text-left px-5 py-3 text-xs text-slate-400 font-medium">İşlem</th>
+              <th className="text-left px-5 py-3 text-xs text-slate-400 font-medium">İşlemler</th>
             </tr>
           </thead>
           <tbody>
@@ -372,18 +430,32 @@ export default function UsersPage() {
                   </td>
 
                   <td className="px-5 py-4">
-                    <button
-                      onClick={() => handleDelete(user.id)}
-                      disabled={!isAdmin || deleting === user.id}
-                      title={!isAdmin ? 'Bu işlem için admin yetkisi gereklidir' : 'Kullanıcıyı sil'}
-                      className={`text-xs px-3 py-1.5 rounded-lg transition-colors font-medium
-                        ${isAdmin
-                          ? 'bg-danger/10 text-danger hover:bg-danger/20 cursor-pointer'
-                          : 'bg-slate-800 text-slate-600 cursor-not-allowed opacity-30'
-                        }`}
-                    >
-                      {deleting === user.id ? '...' : 'Sil'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => openPermModal(user)}
+                        disabled={!isAdmin}
+                        title={!isAdmin ? 'Bu işlem için admin yetkisi gereklidir' : 'Özel yetkileri yönet'}
+                        className={`text-xs px-3 py-1.5 rounded-lg transition-colors font-medium
+                          ${isAdmin
+                            ? 'bg-accent/10 text-accent hover:bg-accent/20 cursor-pointer'
+                            : 'bg-slate-800 text-slate-600 cursor-not-allowed opacity-30'
+                          }`}
+                      >
+                        Yetkiler
+                      </button>
+                      <button
+                        onClick={() => handleDelete(user.id)}
+                        disabled={!isAdmin || deleting === user.id}
+                        title={!isAdmin ? 'Bu işlem için admin yetkisi gereklidir' : 'Kullanıcıyı sil'}
+                        className={`text-xs px-3 py-1.5 rounded-lg transition-colors font-medium
+                          ${isAdmin
+                            ? 'bg-danger/10 text-danger hover:bg-danger/20 cursor-pointer'
+                            : 'bg-slate-800 text-slate-600 cursor-not-allowed opacity-30'
+                          }`}
+                      >
+                        {deleting === user.id ? '...' : 'Sil'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -397,161 +469,141 @@ export default function UsersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="bg-[#050505] border border-primary/30 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
 
-            {/* Modal Başlık */}
             <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-primary/10">
               <div>
                 <h2 className="text-white text-lg font-semibold">Yeni Kullanıcı Oluştur</h2>
                 <p className="text-slate-500 text-xs mt-0.5">Bilgileri doldurun ve izinleri belirleyin</p>
               </div>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-slate-500 hover:text-white text-xl leading-none transition-colors"
-              >
+              <button onClick={() => setShowModal(false)} className="text-slate-500 hover:text-white text-xl leading-none transition-colors">
                 ×
               </button>
             </div>
 
-            {/* Modal İçerik — kaydırılabilir */}
             <div className="overflow-y-auto px-6 py-5 space-y-5 flex-1">
-
-              {/* Ad Soyad */}
               <div>
                 <label className="text-xs text-slate-400 mb-1.5 block">Ad Soyad</label>
-                <input
-                  type="text"
-                  placeholder="Ahmet Yılmaz"
-                  value={form.full_name}
-                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                  className="w-full bg-[#0d0d0d] border border-primary/20 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary placeholder:text-slate-600 transition-colors"
-                />
+                <input type="text" placeholder="Ahmet Yılmaz" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="w-full bg-[#0d0d0d] border border-primary/20 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary placeholder:text-slate-600 transition-colors" />
               </div>
-
-              {/* E-posta */}
               <div>
                 <label className="text-xs text-slate-400 mb-1.5 block">E-posta</label>
-                <input
-                  type="email"
-                  placeholder="ornek@sirket.com"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full bg-[#0d0d0d] border border-primary/20 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary placeholder:text-slate-600 transition-colors"
-                />
+                <input type="email" placeholder="ornek@sirket.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full bg-[#0d0d0d] border border-primary/20 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary placeholder:text-slate-600 transition-colors" />
               </div>
-
-              {/* Şifre */}
               <div>
                 <label className="text-xs text-slate-400 mb-1.5 block">Şifre</label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full bg-[#0d0d0d] border border-primary/20 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary placeholder:text-slate-600 transition-colors"
-                />
+                <input type="password" placeholder="••••••••" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="w-full bg-[#0d0d0d] border border-primary/20 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-primary placeholder:text-slate-600 transition-colors" />
               </div>
 
-              {/* Hızlı Rol Şablonu */}
               <div>
                 <label className="text-xs text-slate-400 mb-2 block">Rol Şablonu</label>
                 <div className="grid grid-cols-3 gap-2">
-                  {ROLES.map((r) => {
-                    const isActive = form.role_id === r.id
-                    return (
-                      <button
-                        key={r.id}
-                        type="button"
-                        onClick={() => handleRoleSelect(r.id)}
-                        className={`flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl border text-xs font-medium transition-all duration-150
-                          ${isActive
-                            ? 'border-primary/50 bg-primary/10 text-white shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.15)]'
-                            : 'border-slate-700/50 bg-[#0d0d0d] text-slate-400 hover:border-slate-600 hover:text-slate-300'
-                          }`}
-                      >
-                        <span className={`w-2 h-2 rounded-full ${r.dot}`} />
-                        <span>{r.label}</span>
-                        <span className="text-[10px] text-slate-500 font-normal">{r.permissions.length} yetki</span>
-                      </button>
-                    )
-                  })}
+                  {ROLES.map((r) => (
+                    <button key={r.id} type="button" onClick={() => handleRoleSelect(r.id)} className={`flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl border text-xs font-medium transition-all duration-150 ${form.role_id === r.id ? 'border-primary/50 bg-primary/10 text-white shadow-[0_0_12px_rgba(var(--color-primary-rgb),0.15)]' : 'border-slate-700/50 bg-[#0d0d0d] text-slate-400 hover:border-slate-600 hover:text-slate-300'}`}>
+                      <span className={`w-2 h-2 rounded-full ${r.dot}`} />
+                      <span>{r.label}</span>
+                      <span className="text-[10px] text-slate-500 font-normal">{r.permissions.length} yetki</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Yetki Seçimi */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs text-slate-400">Yetkiler</label>
                   <div className="flex items-center gap-2">
-                    <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${matchedRole?.color || 'text-slate-400 bg-slate-700/40'}`}>
-                      {matchedRole?.label}
-                    </span>
-                    <span className="text-[10px] text-slate-600">
-                      {selectedPermsCount}/{Object.keys(ALL_PERMISSIONS).length} seçili
-                    </span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${matchedRole?.color || 'text-slate-400 bg-slate-700/40'}`}>{matchedRole?.label}</span>
+                    <span className="text-[10px] text-slate-600">{selectedPermsCount}/{Object.keys(ALL_PERMISSIONS).length} seçili</span>
                   </div>
                 </div>
 
                 <div className="rounded-xl border border-primary/15 overflow-hidden">
                   {Object.entries(ALL_PERMISSIONS).map(([perm, info], idx, arr) => (
-                    <div
-                      key={perm}
-                      onClick={() => togglePerm(perm)}
-                      className={`flex items-center justify-between px-4 py-3.5 cursor-pointer select-none transition-colors duration-150
-                        hover:bg-white/[0.025]
-                        ${idx < arr.length - 1 ? 'border-b border-white/[0.05]' : ''}
-                        ${draftPerms[perm] ? 'bg-primary/5' : 'bg-[#0a0a0a]'}
-                      `}
-                    >
-                      {/* İzin adı + açıklama */}
+                    <div key={perm} onClick={() => togglePerm(perm)} className={`flex items-center justify-between px-4 py-3.5 cursor-pointer select-none transition-colors duration-150 hover:bg-white/[0.025] ${idx < arr.length - 1 ? 'border-b border-white/[0.05]' : ''} ${draftPerms[perm] ? 'bg-primary/5' : 'bg-[#0a0a0a]'}`}>
                       <div className="flex-1 min-w-0 pr-4">
-                        <p className={`text-sm font-medium transition-colors duration-150 ${draftPerms[perm] ? 'text-white' : 'text-slate-400'}`}>
-                          {info.label}
-                        </p>
+                        <p className={`text-sm font-medium transition-colors duration-150 ${draftPerms[perm] ? 'text-white' : 'text-slate-400'}`}>{info.label}</p>
                         <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">{info.desc}</p>
                       </div>
-
-                      {/* Toggle Switch */}
-                      <div
-                        role="switch"
-                        aria-checked={draftPerms[perm]}
-                        onClick={(e) => { e.stopPropagation(); togglePerm(perm) }}
-                        className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 cursor-pointer
-                          ${draftPerms[perm] ? 'bg-primary' : 'bg-slate-700'}`}
-                      >
-                        <span
-                          className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200
-                            ${draftPerms[perm] ? 'translate-x-5' : 'translate-x-0'}`}
-                        />
+                      <div role="switch" aria-checked={draftPerms[perm]} onClick={(e) => { e.stopPropagation(); togglePerm(perm) }} className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 cursor-pointer ${draftPerms[perm] ? 'bg-primary' : 'bg-slate-700'}`}>
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${draftPerms[perm] ? 'translate-x-5' : 'translate-x-0'}`} />
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {formError && (
-                <p className="text-danger text-xs">{formError}</p>
-              )}
+              {formError && <p className="text-danger text-xs">{formError}</p>}
             </div>
 
-            {/* Modal Alt Butonlar */}
             <div className="flex gap-3 px-6 py-4 border-t border-primary/10">
-              <button
-                onClick={() => setShowModal(false)}
-                className="flex-1 bg-[#0d0d0d] border border-primary/20 text-slate-300 text-sm font-medium px-4 py-2.5 rounded-lg hover:border-primary/40 transition-colors"
-              >
+              <button onClick={() => setShowModal(false)} className="flex-1 bg-[#0d0d0d] border border-primary/20 text-slate-300 text-sm font-medium px-4 py-2.5 rounded-lg hover:border-primary/40 transition-colors">İptal</button>
+              <button onClick={handleCreate} disabled={creating} className="flex-1 bg-primary text-black text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors">{creating ? 'Oluşturuluyor...' : 'Kullanıcı Oluştur'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Kişiye Özel İzin Yönetimi Modal ─────────────────────────────── */}
+      {isPermModalOpen && permUser && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-[#050505] border border-primary/30 rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh]">
+            
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-primary/10">
+              <div>
+                <h2 className="text-white text-lg font-semibold">Özel Yetkiler</h2>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  <span className="text-white font-medium">{permUser.full_name || permUser.email}</span> kullanıcısının izinlerini düzenleyin
+                </p>
+              </div>
+              <button onClick={() => setIsPermModalOpen(false)} className="text-slate-500 hover:text-white text-xl leading-none transition-colors">
+                ×
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-6 py-5 flex-1">
+              {permLoading ? (
+                <div className="flex flex-col gap-3">
+                  {[1, 2, 3, 4].map(i => <div key={i} className="h-14 w-full rounded-xl skeleton" />)}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-primary/15 overflow-hidden">
+                  {Object.entries(ALL_PERMISSIONS).map(([perm, info], idx, arr) => (
+                    <div
+                      key={perm}
+                      onClick={() => toggleUserPerm(perm)}
+                      className={`flex items-center justify-between px-4 py-3.5 cursor-pointer select-none transition-colors duration-150 hover:bg-white/[0.025]
+                        ${idx < arr.length - 1 ? 'border-b border-white/[0.05]' : ''}
+                        ${userPerms[perm] ? 'bg-primary/5' : 'bg-[#0a0a0a]'}
+                      `}
+                    >
+                      <div className="flex-1 min-w-0 pr-4">
+                        <p className={`text-sm font-medium transition-colors duration-150 ${userPerms[perm] ? 'text-white' : 'text-slate-400'}`}>
+                          {info.label}
+                        </p>
+                        <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">{info.desc}</p>
+                      </div>
+                      <div role="switch" aria-checked={userPerms[perm]} onClick={(e) => { e.stopPropagation(); toggleUserPerm(perm) }} className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 cursor-pointer ${userPerms[perm] ? 'bg-accent' : 'bg-slate-700'}`}>
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${userPerms[perm] ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {permError && <p className="text-danger text-xs mt-3">{permError}</p>}
+            </div>
+
+            <div className="flex gap-3 px-6 py-4 border-t border-primary/10">
+              <button onClick={() => setIsPermModalOpen(false)} className="flex-1 bg-[#0d0d0d] border border-primary/20 text-slate-300 text-sm font-medium px-4 py-2.5 rounded-lg hover:border-primary/40 transition-colors">
                 İptal
               </button>
-              <button
-                onClick={handleCreate}
-                disabled={creating}
-                className="flex-1 bg-primary text-black text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
-              >
-                {creating ? 'Oluşturuluyor...' : 'Kullanıcı Oluştur'}
+              <button onClick={handlePermSave} disabled={permLoading || permSaving} className="flex-1 bg-accent text-black text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-accent/90 disabled:opacity-50 transition-colors">
+                {permSaving ? 'Kaydediliyor...' : 'Kaydet'}
               </button>
             </div>
 
           </div>
         </div>
       )}
+
     </div>
   )
 }

@@ -81,6 +81,24 @@ func RequirePermission(q *queries.AuthQueries, permission string) func(http.Hand
 	}
 }
 
+// RequireRoleID — kullanıcının role_id'si maxRoleID'den küçük veya eşit olmalı (1=admin ≤ 2=operator ≤ 3=viewer)
+func RequireRoleID(maxRoleID int) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			claims, ok := r.Context().Value(ClaimsKey).(*commands.Claims)
+			if !ok {
+				pkg.Error(w, http.StatusUnauthorized, "yetkisiz")
+				return
+			}
+			if claims.RoleID == 0 || claims.RoleID > maxRoleID {
+				pkg.Error(w, http.StatusForbidden, "bu işlem için yetkiniz yok")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // RequireRole — değişmedi
 func RequireRole(role string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

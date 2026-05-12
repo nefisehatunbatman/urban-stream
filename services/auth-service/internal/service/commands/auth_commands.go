@@ -79,7 +79,7 @@ func (c *AuthCommands) Register(req dto.RegisterRequest, isAdmin bool) (*dto.Tok
 		perms = []string{}
 	}
 
-	return c.generateTokenPair(userID, req.Email, roleName, perms)
+	return c.generateTokenPair(userID, req.Email, roleName, roleID, perms)
 }
 
 func (c *AuthCommands) Login(req dto.LoginRequest) (*dto.TokenResponse, error) {
@@ -87,15 +87,16 @@ func (c *AuthCommands) Login(req dto.LoginRequest) (*dto.TokenResponse, error) {
 		userID       string
 		passwordHash string
 		roleName     string
+		roleID       int
 		isActive     bool
 	)
 
 	err := c.db.QueryRow(`
-		SELECT u.id, u.password_hash, r.name, u.is_active
+		SELECT u.id, u.password_hash, r.name, u.role_id, u.is_active
 		FROM users u
 		JOIN roles r ON r.id = u.role_id
 		WHERE u.email = $1
-	`, req.Email).Scan(&userID, &passwordHash, &roleName, &isActive)
+	`, req.Email).Scan(&userID, &passwordHash, &roleName, &roleID, &isActive)
 
 	if err == sql.ErrNoRows {
 		return nil, errors.New("email veya şifre hatalı")
@@ -116,7 +117,7 @@ func (c *AuthCommands) Login(req dto.LoginRequest) (*dto.TokenResponse, error) {
 		return nil, err
 	}
 
-	return c.generateTokenPair(userID, req.Email, roleName, permissions)
+	return c.generateTokenPair(userID, req.Email, roleName, roleID, permissions)
 }
 
 func (c *AuthCommands) Refresh(req dto.RefreshRequest) (*dto.TokenResponse, error) {
@@ -126,16 +127,17 @@ func (c *AuthCommands) Refresh(req dto.RefreshRequest) (*dto.TokenResponse, erro
 		userID    string
 		email     string
 		roleName  string
+		roleID    int
 		expiresAt time.Time
 	)
 
 	err := c.db.QueryRow(`
-		SELECT u.id, u.email, r.name, rt.expires_at
+		SELECT u.id, u.email, r.name, u.role_id, rt.expires_at
 		FROM refresh_tokens rt
 		JOIN users u ON u.id = rt.user_id
 		JOIN roles r ON r.id = u.role_id
 		WHERE rt.token_hash = $1 AND u.is_active = TRUE
-	`, tokenHash).Scan(&userID, &email, &roleName, &expiresAt)
+	`, tokenHash).Scan(&userID, &email, &roleName, &roleID, &expiresAt)
 
 	if err == sql.ErrNoRows {
 		return nil, errors.New("geçersiz refresh token")
@@ -155,7 +157,7 @@ func (c *AuthCommands) Refresh(req dto.RefreshRequest) (*dto.TokenResponse, erro
 		return nil, err
 	}
 
-	return c.generateTokenPair(userID, email, roleName, permissions)
+	return c.generateTokenPair(userID, email, roleName, roleID, permissions)
 }
 
 func (c *AuthCommands) Logout(refreshToken string) error {
@@ -202,6 +204,26 @@ func (c *AuthCommands) UpdateRolePermissions(roleID int, permissions []string) e
 	return tx.Commit()
 }
 
+// CreateRole — Yeni bir rol oluşturur ve izinlerini atar
+func (c *AuthCommands) CreateRole(name string, permissions []string) (int, error) {
+	var roleID int
+	err := c.db.QueryRow(`INSERT INTO roles (name) VALUES ($1) RETURNING id`, name).Scan(&roleID)
+	if err != nil {
+		return 0, fmt.Errorf("rol oluşturulamadı: %w", err)
+	}
+
+	if err := c.UpdateRolePermissions(roleID, permissions); err != nil {
+		return roleID, fmt.Errorf("rol oluşturuldu ancak izinler eklenemedi: %w", err)
+	}
+
+	return roleID, nil
+}
+
+// UpdateUserPermissions — Kullanıcıya özel izinleri günceller
+func (c *AuthCommands) UpdateUserPermissions(userID string, permissions []string) error {
+	return c.saveUserPermissions(userID, permissions)
+}
+
 // UpdateUser — Kullanıcı adını ve şifresini günceller (şifre boş değilse)
 func (c *AuthCommands) UpdateUser(userID string, fullName, password string) error {
 	if password != "" {
@@ -225,8 +247,8 @@ func (c *AuthCommands) DeleteUser(userID string) error {
 
 // --- Yardımcı fonksiyonlar ---
 
-func (c *AuthCommands) generateTokenPair(userID, email, role string, permissions []string) (*dto.TokenResponse, error) {
-	accessToken, err := c.jwtService.GenerateAccessToken(userID, email, role, permissions)
+func (c *AuthCommands) generateTokenPair(userID, email, role string, roleID int, permissions []string) (*dto.TokenResponse, error) {
+	accessToken, err := c.jwtService.GenerateAccessToken(userID, email, role, roleID, permissions)
 	if err != nil {
 		return nil, fmt.Errorf("access token üretilemedi: %w", err)
 	}

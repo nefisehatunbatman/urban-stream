@@ -203,3 +203,60 @@ func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	}
 	pkg.JSON(w, http.StatusOK, map[string]string{"message": "profil güncellendi"})
 }
+
+// CreateRole - POST /roles
+func (h *AuthHandler) CreateRole(w http.ResponseWriter, r *http.Request) {
+	var req dto.CreateRoleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		pkg.Error(w, http.StatusBadRequest, "gecersiz istek")
+		return
+	}
+	if req.Name == "" {
+		pkg.Error(w, http.StatusBadRequest, "rol adi zorunludur")
+		return
+	}
+
+	roleID, err := h.commands.CreateRole(req.Name, req.Permissions)
+	if err != nil {
+		pkg.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	pkg.JSON(w, http.StatusCreated, map[string]interface{}{"id": roleID, "message": "rol olusturuldu"})
+}
+
+// GetUserPermissions - GET /users/{id}/permissions
+func (h *AuthHandler) GetUserPermissions(w http.ResponseWriter, r *http.Request) {
+	userID := chi.URLParam(r, "id")
+	if userID == "" {
+		pkg.Error(w, http.StatusBadRequest, "gecersiz kullanici id")
+		return
+	}
+
+	perms, err := h.queries.GetPermissions(userID)
+	if err != nil {
+		pkg.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	pkg.JSON(w, http.StatusOK, map[string]interface{}{"permissions": perms})
+}
+
+// UpdateUserPermissions - PUT /users/{id}/permissions
+func (h *AuthHandler) UpdateUserPermissions(w http.ResponseWriter, r *http.Request) {
+	userID := chi.URLParam(r, "id")
+	if userID == "" {
+		pkg.Error(w, http.StatusBadRequest, "gecersiz kullanici id")
+		return
+	}
+
+	var req dto.UpdateUserPermissionsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		pkg.Error(w, http.StatusBadRequest, "gecersiz istek")
+		return
+	}
+
+	if err := h.commands.UpdateUserPermissions(userID, req.Permissions); err != nil {
+		pkg.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	pkg.JSON(w, http.StatusOK, map[string]string{"message": "kullanici izinleri guncellendi"})
+}

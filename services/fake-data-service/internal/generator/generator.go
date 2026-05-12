@@ -81,6 +81,7 @@ var intersections = []Intersection{
 	{ID: "INT-010", Name: "Belediye Kavşağı", Type: Fixed, Location: domain.Location{Lat: 37.8745, Lng: 32.4890}},
 }
 
+// ayar yoksa default ayar ver
 func resolveConfig(inter Intersection) PhaseConfig {
 	if inter.Config != nil {
 		return *inter.Config
@@ -92,12 +93,14 @@ func resolveConfig(inter Intersection) PhaseConfig {
 }
 
 // ─── Event Kuyruğu ────────────────────────────────────────────────────────────
-
+// 5000 kapasiteli bufferi olan bir channel tanimladik
 var eventQueue = make(chan domain.TrafficLight, 5000)
 
+// bu degisken kuyruga sigmadigi icin atilanlarin sayisini tutar
 var droppedCount atomic.Int64
 
 func init() {
+	//ilk acildiginda asiri yukleme olmamasi icin kademeli baslatiriz 1.kavsak baslar 300 sn sonra digeri ... seklinde ilerler
 	for i, inter := range intersections {
 		startDelay := time.Duration(i*300) * time.Millisecond
 		go runIntersection(inter, startDelay)
@@ -117,19 +120,19 @@ func init() {
 
 func runIntersection(inter Intersection, startDelay time.Duration) {
 	rnd := newRnd()
-	cfg := resolveConfig(inter)
-	time.Sleep(startDelay)
+	cfg := resolveConfig(inter) //kavsak akill mi degil mi bakariz oa gore isiklaarin yanma surelerine bakilir
+	time.Sleep(startDelay)      //kavsaklar ayni anda degil sirayla uyaniyor
 
-	yellowMs := (cfg.YellowSecs * 1000) / simSpeedFactor
+	yellowMs := (cfg.YellowSecs * 1000) / simSpeedFactor //sari siik suresini ayarlar
 	if yellowMs < 50 {
 		yellowMs = 50
 	}
 
 	for {
 		greenMs := calcGreenMs(cfg, inter.Type, rnd)
-		emit(inter, "N", "green", rnd)
+		emit(inter, "N", "green", rnd) //kuze ve guney yesil
 		emit(inter, "S", "green", rnd)
-		emit(inter, "E", "red", rnd)
+		emit(inter, "E", "red", rnd) //dogu ve bati kirmizi sinayli gonder
 		emit(inter, "W", "red", rnd)
 		time.Sleep(time.Duration(greenMs) * time.Millisecond)
 
@@ -151,19 +154,20 @@ func runIntersection(inter Intersection, startDelay time.Duration) {
 }
 
 func calcGreenMs(cfg PhaseConfig, t IntersectionType, rnd *rand.Rand) int {
-	spread := cfg.GreenMax - cfg.GreenMin
+	spread := cfg.GreenMax - cfg.GreenMin //alabilecegi deger araligi hesaplanir
 	if spread < 0 {
 		spread = 0
 	}
 
 	var secs int
-	if t == Fixed {
-		jitter := spread
+	if t == Fixed { //sabit kavsaksa
+		jitter := spread //tum isklar ayni olmasin diye jitter ile bi sapma ekliyoruz
 		if jitter < 2 {
 			jitter = 2
 		}
 		secs = cfg.GreenMin + rnd.Intn(jitter+1)
 	} else {
+		//yogunluga gore sureyi ayarliyor
 		density := rnd.Intn(100)
 		q := spread / 4
 		if q < 1 {
@@ -180,7 +184,7 @@ func calcGreenMs(cfg PhaseConfig, t IntersectionType, rnd *rand.Rand) int {
 			secs = cfg.GreenMin + 3*q + rnd.Intn(q+1)
 		}
 	}
-
+	//simspeedfactorun mantikli siirlar icinde olmasini saglariz mesela 1000 olurs isik 1ms yanip sobeilir bu da mantiikli olmaz
 	ms := (secs * 1000) / simSpeedFactor
 	if ms < 50 {
 		ms = 50
@@ -195,7 +199,7 @@ func emit(inter Intersection, dir string, status string, rnd *rand.Rand) {
 		IntersectionID:   inter.ID,
 		Status:           status,
 		ChangedAt:        time.Now(),
-		IsMalfunctioning: rnd.Float64() < 0.01,
+		IsMalfunctioning: rnd.Float64() < 0.01, //%1 ihttimalle lamba bozuk sinyali gonderiyoruz
 		Location:         inter.Location,
 	}
 	select {
@@ -226,7 +230,7 @@ func initZonePool() {
 	rnd := newRnd()
 	zones := make([]zoneInfo, 50)
 	for i := range zones {
-		isMain := rnd.Float64() < 0.35
+		isMain := rnd.Float64() < 0.35 //%35 ihtimalle merkezi bir yer olsun diye ihtimal verdik
 		var lat, lng float64
 		if isMain {
 			lat = 37.8714 + (rnd.Float64()-0.5)*0.02
@@ -235,11 +239,12 @@ func initZonePool() {
 			lat = minLat + rnd.Float64()*(maxLat-minLat)
 			lng = minLng + rnd.Float64()*(maxLng-minLng)
 		}
-		zones[i] = zoneInfo{id: fmt.Sprintf("Z-%04d", i), lat: lat, lng: lng}
+		zones[i] = zoneInfo{id: fmt.Sprintf("Z-%04d", i), lat: lat, lng: lng} //her zone icin bir id verilir
 	}
-	zonePool = zones
+	zonePool = zones //hazirlanan liste global bi degiskene atanir
 }
 
+// rand komutu threadsafe degildir yani aynı anda birden fazla goroutine tarafından kullanilirsa hatali islem yapilabilir race condition olusur bu yuzden mutex ile kilitliyoruz
 var densityRnd = newRnd()
 var densityRndMu sync.Mutex
 
@@ -253,7 +258,7 @@ func GenerateDensity() domain.Density {
 	avgSpeedBase := 60.0 - float64(vehicleCount)*0.15
 	avgSpeedJitter := (rnd.Float64() - 0.5) * 10
 	cars := int(float64(vehicleCount) * (0.75 + (rnd.Float64()-0.5)*0.1))
-	buses := int(float64(vehicleCount) * (0.08 + rnd.Float64()*0.05))
+	buses := int(float64(vehicleCount) * (0.08 + rnd.Float64()*0.05)) 
 	densityRndMu.Unlock()
 
 	avgSpeed := 0.0

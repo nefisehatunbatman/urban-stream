@@ -26,16 +26,16 @@ func main() {
 	// 3. Bağlantıyı test et baglanti yoksa veri uretmek anlamsiz olur
 	_, err := rdb.Ping(context.Background()).Result()
 	if err != nil {
-		log.Fatalf("Redis bağlantı hatası: %v", err)
+		log.Fatalf("Redis bağlantı hatası: %v", err) //redis baglantisi yoksa programi direkt kapat
 	}
 
 	fmt.Println("Redis bağlantısı başarılı")
 
-	// 4. Producer'ları başlat
+	// 4. Producer'ları baslat
 	producer.StartProducers(rdb)
 
 	fmt.Println("Veri üretimi başladı...")
 
-	// 5. Programın kapanmaması için blokla
+	// 5. Programin kapanmamasi icin blokla
 	select {}
 }

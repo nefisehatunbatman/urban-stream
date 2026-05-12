@@ -1,17 +1,19 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 
+// minRoleID: bu menüyü görmek için kullanıcının role_id'si en fazla bu değer olmalı
+// 1=admin (en yetkili), 2=operator, 3=viewer (en az yetkili)
 const navItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: 'DB', permission: 'view_stats' },
-  { path: '/live', label: 'Canlı Akış', icon: 'LV', permission: 'view_stats' },
-  { path: '/map', label: 'Harita', icon: 'MP', permission: 'view_map' },
-  { path: '/reports', label: 'Raporlar', icon: 'RP', permission: 'create_report' },
-  { path: '/users', label: 'Kullanıcılar', icon: 'US', permission: 'manage_users' },
-  { path: '/roles', label: 'Roller & Yetkiler', icon: 'RL', permission: 'assign_roles' },
+  { path: '/dashboard', label: 'Dashboard',       icon: 'DB', minRoleID: 3 },
+  { path: '/live',      label: 'Canlı Akış',      icon: 'LV', minRoleID: 3 },
+  { path: '/map',       label: 'Harita',           icon: 'MP', minRoleID: 3 },
+  { path: '/reports',   label: 'Raporlar',         icon: 'RP', minRoleID: 2 },
+  { path: '/users',     label: 'Kullanıcılar',     icon: 'US', minRoleID: 1 },
+  { path: '/roles',     label: 'Roller & Yetkiler',icon: 'RL', minRoleID: 1 },
 ]
 
 export default function Sidebar() {
-  const { user, logout, hasPermission } = useAuthStore()
+  const { user, logout, hasRoleID } = useAuthStore()
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -28,7 +30,7 @@ export default function Sidebar() {
 
       <nav className="flex-1 p-4 space-y-1">
         {navItems.map((item) => {
-          if (!hasPermission(item.permission)) return null
+          if (!hasRoleID(item.minRoleID)) return null
           return (
             <NavLink
               key={item.path}

@@ -32,6 +32,17 @@ type UpdateRolePermissionsRequest struct {
 	Permissions []string `json:"permissions"` // İzin adları: ["manage_users","view_stats",...]
 }
 
+// CreateRoleRequest — POST /roles gövdesi
+type CreateRoleRequest struct {
+	Name        string   `json:"name"`
+	Permissions []string `json:"permissions"`
+}
+
+// UpdateUserPermissionsRequest — PUT /users/:id/permissions gövdesi
+type UpdateUserPermissionsRequest struct {
+	Permissions []string `json:"permissions"`
+}
+
 // UpdateUserRequest — PUT /users/:id veya PUT /auth/me gövdesi
 type UpdateUserRequest struct {
 	FullName string `json:"full_name"`
@@ -51,6 +62,7 @@ type UserResponse struct {
 	Email       string   `json:"email"`
 	FullName    string   `json:"full_name"`
 	Role        string   `json:"role"`
+	RoleID      int      `json:"role_id"`
 	Permissions []string `json:"permissions"`
 	IsActive    bool     `json:"is_active"`
 	CreatedAt   string   `json:"created_at"`
@@ -61,5 +73,6 @@ type MeResponse struct {
 	Email       string   `json:"email"`
 	FullName    string   `json:"full_name"`
 	Role        string   `json:"role"`
+	RoleID      int      `json:"role_id"`
 	Permissions []string `json:"permissions"`
 }

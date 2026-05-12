@@ -21,6 +21,7 @@ type Claims struct {
 	UserID      string   `json:"user_id"`
 	Email       string   `json:"email"`
 	Role        string   `json:"role"`
+	RoleID      int      `json:"role_id"`
 	Permissions []string `json:"permissions"`
 	jwt.RegisteredClaims
 }
@@ -74,11 +75,12 @@ func NewJWTService(privatePath, publicPath string, accessMinutes int) (*JWTServi
 	}, nil
 }
 
-func (j *JWTService) GenerateAccessToken(userID, email, role string, permissions []string) (string, error) {
+func (j *JWTService) GenerateAccessToken(userID, email, role string, roleID int, permissions []string) (string, error) {
 	claims := Claims{
 		UserID:      userID,
 		Email:       email,
 		Role:        role,
+		RoleID:      roleID,
 		Permissions: permissions,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(j.accessTTL)),

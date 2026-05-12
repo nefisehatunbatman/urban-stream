@@ -8,9 +8,7 @@ type Location struct {
 	Lng float64 `json:"lng"`
 }
 
-// TrafficLight city:traffic_lights kanalı için veri yapısı.
-//
-// timing_remains KALDIRILDI.
+// timing_remainsi kaldırdım unutmaaa
 // Gerçek sensörler (özellikle akıllı kavşaklar) bir sonraki geçişin ne zaman
 // olacağını önceden bildirmez — sadece "şu an bu duruma geçtim" olayını atar.
 // Frontend yalnızca bu olayı dinler, tahmin yapmaz.

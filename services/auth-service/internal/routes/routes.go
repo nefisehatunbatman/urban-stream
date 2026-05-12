@@ -14,6 +14,7 @@ import (
 )
 
 func Setup(h *handler.AuthHandler, jwtService *commands.JWTService, q *queries.AuthQueries) *chi.Mux {
+	_ = q // izin sorgusu artık route guard'da kullanılmıyor
 	r := chi.NewRouter()
 
 	r.Use(chiMiddleware.Logger)
@@ -45,19 +46,17 @@ func Setup(h *handler.AuthHandler, jwtService *commands.JWTService, q *queries.A
 		r.Get("/auth/me", h.Me)
 		r.Put("/auth/me", h.UpdateMe)
 
-		// manage_users yetkisi gerekir
+		// Sadece admin (role_id = 1)
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.RequirePermission(q, "manage_users"))
+			r.Use(middleware.RequireRoleID(1))
 			r.Get("/users", h.ListUsers)
 			r.Put("/users/{id}", h.UpdateUser)
 			r.Put("/users/{id}/role", h.AssignRole)
 			r.Delete("/users/{id}", h.DeleteUser)
-		})
-
-		// assign_roles yetkisi gerekir
-		r.Group(func(r chi.Router) {
-			r.Use(middleware.RequirePermission(q, "assign_roles"))
+			r.Get("/users/{id}/permissions", h.GetUserPermissions)
+			r.Put("/users/{id}/permissions", h.UpdateUserPermissions)
 			r.Get("/roles", h.ListRoles)
+			r.Post("/roles", h.CreateRole)
 			r.Put("/roles/{id}", h.UpdateRolePermissions)
 		})
 	})

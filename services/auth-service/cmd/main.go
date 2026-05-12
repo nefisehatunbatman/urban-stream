@@ -41,7 +41,6 @@ func main() {
 	authHandler := handler.NewAuthHandler(authCommands, authQueries)
 
 	// 7. Router
-	// 7. Router
 	router := routes.Setup(authHandler, jwtService, authQueries) // ← authQueries eklendi
 
 	// 8. Server
