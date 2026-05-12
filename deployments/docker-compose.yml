@@ -217,6 +217,16 @@ services:
     volumes:
       - ../services/auth-service/keys:/app/keys:ro
 
+  frontend:
+    build:
+      context: ../services/frontend
+      dockerfile: deployments/Dockerfile
+    container_name: urban-frontend
+    depends_on:
+      - api-service
+    ports:
+      - "80:80"
+      
 volumes:
   clickhouse_data:
   postgres_data:

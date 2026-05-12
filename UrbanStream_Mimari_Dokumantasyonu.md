@@ -87,6 +87,7 @@ Projenin `/services` dizini altında 8 adet bağımsız servis bulunmaktadır. H
 - **Event-Driven Architecture:** Mikroservislerin birbirini beklemeden Kafka üzerinden haberleşmesi. Yüksek erişilebilirlik (High Availability) sağlar.
 - **OLAP Veritabanı Kullanımı:** Geleneksel SQL (Postgres) yerine, büyük veriyi saniyeler içinde analiz etmek için Sütun-Tabanlı (Columnar) ClickHouse kullanılması.
 
+<<<<<<< HEAD
 Bu doküman, projeye yeni dahil olan bir geliştiricinin sistemin tam olarak nasıl çalıştığını anlaması için temel rehber niteliğindedir.
 
 1. Frontend (Tarayıcının Çökmesini Engelleyen Kısım)
@@ -128,3 +129,5 @@ services/analytics-consumer servisinde Kafka'dan saniyede binlerce veri okunur. 
 Batch Writer: internal/consumer/ altındaki density.go, traffic_lights.go dosyalarında bir buffer yapısı (trafficBatchSize = 500 gibi) bulunur.
 Gelen veriler memory'de bir dizide (buf) toplanır. Dizi boyutu 500'e ulaştığında veya belirli bir süre (örneğin 1-2 saniye) geçtiğinde, bu 500 kayıt ClickHouse'a tek bir sorguda (Batch Insert) gönderilir.
 Özetle; Buffer mekanizması, anlık ve yüksek hacimli veri akışlarında sistem kaynaklarının (Tarayıcı RAM/CPU veya Veritabanı Connection havuzu) tükenmesini engellemek için verilerin "biriktirilip toplu halde işlenmesi" prensibiyle çalışır. Tarayıcının akıcı kalmasının sırrı bu mimaridir.
+=======
+>>>>>>> c6d8160791be823924ce56c9697f11d3fe57b679
