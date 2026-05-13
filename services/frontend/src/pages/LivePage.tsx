@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import DensityLivePage from './live/DensitylivePage'
-import TrafficLivePage from './live/TrafficlivePage'
-import ViolationsLivePage from './live/ViolationslivePage'
+import DensityLivePage from './live/Densitylivepage'
+import TrafficLivePage from './live/Trafficlivepage'
+import ViolationsLivePage from './live/Violationslivepage'
 
 type Tab = 'density' | 'traffic' | 'violations'
 const ALL_TABS: Tab[] = ['density', 'traffic', 'violations']
